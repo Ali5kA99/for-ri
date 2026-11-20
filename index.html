@@ -1,0 +1,1782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Для Ри — For Ri</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: #141d19;
+      overflow: hidden;
+      font-family: 'Georgia', serif;
+      color: #f3e9dc;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    /* Superposed UI */
+    .stage-ui {
+      position: fixed;
+      left: 0;
+      right: 0;
+      text-align: center;
+      pointer-events: none;
+      transition: opacity 0.8s ease, transform 0.8s ease;
+      padding: 0 20px;
+    }
+
+    /* Stage 1: Travel */
+    #travel-ui {
+      top: 8%;
+      opacity: 1;
+    }
+    #travel-ui.hidden {
+      opacity: 0;
+      transform: translateY(-15px);
+    }
+    .route-title {
+      font-size: 1.3rem;
+      letter-spacing: 2px;
+      color: #e8d5c4;
+      margin-bottom: 6px;
+    }
+    .route-sub {
+      font-size: 0.92rem;
+      color: #a8b8b0;
+      font-style: italic;
+    }
+
+    /* Stage 2: Main Package */
+    #package-ui {
+      bottom: 8%;
+      opacity: 0;
+      transform: translateY(15px);
+    }
+    #package-ui.visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+    .pkg-label {
+      font-size: 1.45rem;
+      margin-bottom: 6px;
+      color: #fbf6ee;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.85);
+    }
+    .pkg-question {
+      font-size: 0.95rem;
+      color: #e6d7c8;
+      font-style: italic;
+      margin-bottom: 16px;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.85);
+    }
+    #open-btn {
+      background: linear-gradient(135deg, #d4a373 0%, #b5835a 100%);
+      color: #1a1410;
+      border: none;
+      padding: 12px 32px;
+      font-family: 'Georgia', serif;
+      font-size: 1.05rem;
+      font-weight: bold;
+      letter-spacing: 1px;
+      border-radius: 30px;
+      cursor: pointer;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    #open-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 10px 28px rgba(212, 163, 115, 0.5);
+    }
+    #open-btn:active {
+      transform: scale(0.97);
+    }
+
+    /* Stage 3: Interactive Table */
+    #garden-ui {
+      bottom: 4%;
+      opacity: 0;
+    }
+    #garden-ui.visible {
+      opacity: 1;
+    }
+    #garden-ui h1 {
+      font-size: 1.6rem;
+      font-weight: normal;
+      letter-spacing: 2px;
+      margin-bottom: 4px;
+      color: #fbf6ee;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.85);
+    }
+    .hint {
+      font-size: 0.84rem;
+      color: #f3dfc1;
+      text-shadow: 0 1px 6px rgba(0, 0, 0, 0.95);
+      animation: pulseHint 2.4s infinite ease-in-out;
+    }
+    @keyframes pulseHint {
+      0%, 100% { opacity: 0.68; }
+      50% { opacity: 1; }
+    }
+
+    /* Letter Modal */
+    #letter-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(12, 9, 7, 0.75);
+      backdrop-filter: blur(4px);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.45s ease;
+      z-index: 20;
+    }
+    #letter-backdrop.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    #letter-card {
+      background: linear-gradient(145deg, #fbf6ee 0%, #efe4d2 100%);
+      color: #2c221e;
+      max-width: 440px;
+      width: 100%;
+      padding: 34px 30px;
+      border-radius: 10px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65), inset 0 0 0 1px rgba(180, 145, 110, 0.35);
+      position: relative;
+      transform: translateY(18px) scale(0.96);
+      transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+      text-align: left;
+      line-height: 1.65;
+    }
+    #letter-backdrop.open #letter-card {
+      transform: translateY(0) scale(1);
+    }
+    #letter-close {
+      position: absolute;
+      top: 12px;
+      right: 15px;
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      color: #8c7365;
+      cursor: pointer;
+      padding: 4px 8px;
+      line-height: 1;
+    }
+    #letter-close:hover {
+      color: #2c221e;
+    }
+    #letter-title {
+      font-size: 1.35rem;
+      color: #6b3e3e;
+      margin-bottom: 14px;
+      font-weight: normal;
+      border-bottom: 1px solid rgba(107, 62, 62, 0.2);
+      padding-bottom: 8px;
+    }
+    #letter-body p {
+      font-size: 0.98rem;
+      margin-bottom: 12px;
+      color: #3a2e29;
+    }
+    #letter-signature {
+      margin-top: 18px;
+      text-align: right;
+      font-style: italic;
+      color: #6b3e3e;
+      font-size: 1.05rem;
+    }
+  </style>
+</head>
+<body>
+
+  <canvas id="scene"></canvas>
+
+  <!-- Stage 1 UI: Flight -->
+  <div id="travel-ui" class="stage-ui">
+    <div class="route-title">Argentina &rarr; Russia</div>
+    <div class="route-sub" id="distance-text">Sending a gift across 15,400 km...</div>
+  </div>
+
+  <!-- Stage 2 UI: Main Package -->
+  <div id="package-ui" class="stage-ui">
+    <div class="pkg-label">Посылка для Ри &bull; Package for Ri</div>
+    <div class="pkg-question">Would you like to open it?</div>
+    <button id="open-btn">Open package</button>
+  </div>
+
+  <!-- Stage 3 UI: Interactive Table -->
+  <div id="garden-ui" class="stage-ui">
+    <h1>Для Ри</h1>
+    <div class="hint" id="garden-hint">Tap to grow flowers &bull; Open the extra gift &bull; Tap the envelope to read</div>
+  </div>
+
+  <!-- Letter Modal -->
+  <div id="letter-backdrop">
+    <div id="letter-card">
+      <button id="letter-close" aria-label="Close">&times;</button>
+      <h2 id="letter-title"></h2>
+      <div id="letter-body"></div>
+      <div id="letter-signature"></div>
+    </div>
+  </div>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      // =========================================================
+      // LETTER CONFIGURATION (Edit these texts to personalize)
+      // =========================================================
+      const CARTA_CONFIG = {
+        titulo: "Для Ри / For Ri",
+        parrafos: [
+          "I had the idea to make you this page, I hope you like it hahaha",
+          "I love you so much my dear Ri))"
+        ],
+        firma: "Tomasik from Argentina <3"
+      };
+      // =========================================================
+
+      document.getElementById('letter-title').textContent = CARTA_CONFIG.titulo;
+      const bodyContainer = document.getElementById('letter-body');
+      CARTA_CONFIG.parrafos.forEach(texto => {
+        const p = document.createElement('p');
+        p.textContent = texto;
+        bodyContainer.appendChild(p);
+      });
+      document.getElementById('letter-signature').textContent = CARTA_CONFIG.firma;
+
+      const backdrop = document.getElementById('letter-backdrop');
+      const closeBtn = document.getElementById('letter-close');
+      closeBtn.addEventListener('click', () => backdrop.classList.remove('open'));
+      backdrop.addEventListener('click', (e) => {
+        if (e.target === backdrop) backdrop.classList.remove('open');
+      });
+
+      // ---------------------------------------------------------
+      // WEB AUDIO API: REALISTIC MATE BOMBILLA SIP SOUND
+      // ---------------------------------------------------------
+      let audioCtx = null;
+
+      function playMateSipSound() {
+        try {
+          if (!audioCtx) {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+          }
+          if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+          }
+
+          const duration = 1.25;
+          const sampleRate = audioCtx.sampleRate;
+          const length = Math.floor(sampleRate * duration);
+          const buffer = audioCtx.createBuffer(1, length, sampleRate);
+          const data = buffer.getChannelData(0);
+
+          let bubblePhase = 0;
+          for (let i = 0; i < length; i++) {
+            const t = i / sampleRate;
+            const env = Math.sin(Math.min(1, t / 0.15) * (Math.PI / 2)) *
+                        Math.max(0, 1 - Math.pow(Math.max(0, (t - 0.75) / 0.5), 1.5));
+
+            const bubbleFreq = 26 + Math.sin(t * 19) * 12 + (t > 0.65 ? 18 : 0);
+            bubblePhase += (bubbleFreq * Math.PI * 2) / sampleRate;
+            const bubbleMod = 0.45 + 0.55 * Math.max(0, Math.sin(bubblePhase));
+
+            const white = Math.random() * 2 - 1;
+            data[i] = white * bubbleMod * env * 0.55;
+          }
+
+          const source = audioCtx.createBufferSource();
+          source.buffer = buffer;
+
+          const filter = audioCtx.createBiquadFilter();
+          filter.type = 'bandpass';
+          filter.frequency.setValueAtTime(650, audioCtx.currentTime);
+          filter.frequency.exponentialRampToValueAtTime(1450, audioCtx.currentTime + duration * 0.85);
+          filter.Q.value = 3.2;
+
+          const gain = audioCtx.createGain();
+          gain.gain.setValueAtTime(0.75, audioCtx.currentTime);
+
+          source.connect(filter);
+          filter.connect(gain);
+          gain.connect(audioCtx.destination);
+          source.start();
+        } catch (err) {
+          // Audio fallback silently ignored if blocked
+        }
+      }
+
+      // ---------------------------------------------------------
+      // CANVAS & SCENE SETUP
+      // ---------------------------------------------------------
+      const canvas = document.getElementById('scene');
+      const ctx = canvas.getContext('2d');
+      let width = window.innerWidth;
+      let height = window.innerHeight;
+
+      function resize() {
+        width = canvas.width = window.innerWidth || document.documentElement.clientWidth;
+        height = canvas.height = window.innerHeight || document.documentElement.clientHeight;
+      }
+      window.addEventListener('resize', resize);
+      resize();
+
+      // States: 'TRAVEL' -> 'PACKAGE' -> 'GARDEN'
+      let state = 'TRAVEL';
+      let stateStartTime = performance.now();
+
+      // Extra gift state ('BOX' -> 'MATE')
+      let extraGiftState = 'BOX';
+      let extraGiftTime = 0;
+      let lastMateSipTime = -10;
+
+      // Curious Black Cat Paw state
+      const catPaw = {
+        active: false,
+        nextSpawn: performance.now() + 5000,
+        startTime: 0,
+        duration: 4.4,
+        targetType: 'POT', // 'LEFT', 'POT', 'RIGHT'
+        tilt: 0.15,
+        startled: false,
+        startleTime: 0
+      };
+      let catPawHitbox = { x: 0, y: 0, w: 0, h: 0, active: false };
+
+      const travelUI = document.getElementById('travel-ui');
+      const distanceText = document.getElementById('distance-text');
+      const packageUI = document.getElementById('package-ui');
+      const openBtn = document.getElementById('open-btn');
+      const gardenUI = document.getElementById('garden-ui');
+
+      // Snowflakes outside window
+      const snowflakes = Array.from({ length: 28 }, () => ({
+        x: Math.random(),
+        y: Math.random(),
+        r: Math.random() * 2 + 1,
+        speedY: Math.random() * 0.002 + 0.001,
+        sway: Math.random() * Math.PI * 2
+      }));
+
+      // Steam particles rising from hot mate
+      const steamParticles = Array.from({ length: 12 }, (_, i) => ({
+        offset: (i / 12) * Math.PI * 2,
+        speed: 0.4 + Math.random() * 0.3
+      }));
+
+      // Streamers & confetti particles
+      const streamers = [];
+
+      function spawnCelebration(cx, cy, count = 65) {
+        const colors = ['#f4d35e', '#ee964b', '#f28482', '#f6bd60', '#84a59d', '#f5cac3', '#e07a5f'];
+        for (let i = 0; i < count; i++) {
+          const angle = -Math.PI / 2 + (Math.random() - 0.5) * 2.2;
+          const speed = Math.random() * 8 + 3.5;
+          streamers.push({
+            x: cx + (Math.random() - 0.5) * 35,
+            y: cy + (Math.random() - 0.5) * 18,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - 2,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            isRibbon: i % 2 === 0,
+            length: Math.random() * 16 + 10,
+            width: Math.random() * 4 + 3,
+            rotation: Math.random() * Math.PI * 2,
+            vRot: (Math.random() - 0.5) * 0.18,
+            wavePhase: Math.random() * Math.PI * 2,
+            alpha: 1
+          });
+        }
+      }
+
+      function updateAndDrawStreamers(now) {
+        for (let i = streamers.length - 1; i >= 0; i--) {
+          const s = streamers[i];
+          s.x += s.vx + Math.sin(now * 0.006 + s.wavePhase) * 0.9;
+          s.y += s.vy;
+          s.vy += 0.18;
+          s.vx *= 0.985;
+          s.rotation += s.vRot;
+
+          if (s.y > height * 0.82) {
+            s.alpha -= 0.015;
+          }
+
+          if (s.alpha <= 0 || s.y > height + 30) {
+            streamers.splice(i, 1);
+            continue;
+          }
+
+          ctx.save();
+          ctx.translate(s.x, s.y);
+          ctx.rotate(s.rotation);
+          ctx.globalAlpha = Math.max(0, s.alpha);
+
+          if (s.isRibbon) {
+            ctx.strokeStyle = s.color;
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            for (let t = 0; t <= s.length; t += 3) {
+              const wx = Math.sin(t * 0.35 + now * 0.01) * 4;
+              if (t === 0) ctx.moveTo(wx, 0);
+              else ctx.lineTo(wx, t);
+            }
+            ctx.stroke();
+          } else {
+            ctx.fillStyle = s.color;
+            ctx.fillRect(-s.width / 2, -s.width, s.width, s.width * 1.8);
+          }
+
+          ctx.restore();
+        }
+      }
+
+      function drawRoundedRect(x, y, w, h, r) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y);
+        ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+        ctx.lineTo(x + w, y + h - r);
+        ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        ctx.lineTo(x + r, y + h);
+        ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath();
+      }
+
+      // ---------------------------------------------------------
+      // COZY HOME ROOM BACKGROUND (Window, Furniture & Wooden Table)
+      // ---------------------------------------------------------
+      function drawRoomBackground(elapsed) {
+        const tableY = height * 0.72;
+
+        // Warm interior wall
+        const wallGrad = ctx.createLinearGradient(0, 0, 0, tableY);
+        wallGrad.addColorStop(0, '#3b332d');
+        wallGrad.addColorStop(0.6, '#4d4138');
+        wallGrad.addColorStop(1, '#332a24');
+        ctx.fillStyle = wallGrad;
+        ctx.fillRect(0, 0, width, tableY);
+
+        ctx.fillStyle = 'rgba(255, 245, 230, 0.02)';
+        for (let wx = 0; wx < width; wx += 36) {
+          ctx.fillRect(wx, 0, 14, tableY);
+        }
+
+        // Window on the left-center
+        const winW = Math.min(240, width * 0.34);
+        const winH = Math.min(280, height * 0.42);
+        const winX = Math.max(24, width * 0.14);
+        const winY = height * 0.14;
+
+        const skyGrad = ctx.createLinearGradient(winX, winY, winX, winY + winH);
+        skyGrad.addColorStop(0, '#7294b5');
+        skyGrad.addColorStop(0.65, '#adc5db');
+        skyGrad.addColorStop(1, '#e6eef5');
+        ctx.fillStyle = skyGrad;
+        ctx.fillRect(winX, winY, winW, winH);
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(winX, winY, winW, winH);
+        ctx.clip();
+
+        ctx.fillStyle = '#d8e4ef';
+        ctx.beginPath();
+        ctx.moveTo(winX, winY + winH);
+        ctx.lineTo(winX, winY + winH * 0.72);
+        ctx.quadraticCurveTo(winX + winW * 0.4, winY + winH * 0.62, winX + winW, winY + winH * 0.75);
+        ctx.lineTo(winX + winW, winY + winH);
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+        snowflakes.forEach(s => {
+          s.y += s.speedY;
+          if (s.y > 1) s.y = 0;
+          const sx = winX + ((s.x + Math.sin(elapsed + s.sway) * 0.03 + 1) % 1) * winW;
+          const sy = winY + s.y * winH;
+          ctx.beginPath();
+          ctx.arc(sx, sy, s.r, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        ctx.restore();
+
+        // Wooden window frame & panes
+        ctx.strokeStyle = '#efe5d8';
+        ctx.lineWidth = 8;
+        ctx.strokeRect(winX, winY, winW, winH);
+
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.moveTo(winX + winW / 2, winY);
+        ctx.lineTo(winX + winW / 2, winY + winH);
+        ctx.moveTo(winX, winY + winH * 0.45);
+        ctx.lineTo(winX + winW, winY + winH * 0.45);
+        ctx.stroke();
+
+        ctx.fillStyle = '#e3d5c3';
+        drawRoundedRect(winX - 10, winY + winH, winW + 20, 12, 3);
+        ctx.fill();
+
+        // Curtains
+        const curtainGradL = ctx.createLinearGradient(winX - 24, winY, winX + 26, winY);
+        curtainGradL.addColorStop(0, '#7a4b47');
+        curtainGradL.addColorStop(0.5, '#99625d');
+        curtainGradL.addColorStop(1, '#663c39');
+        ctx.fillStyle = curtainGradL;
+        ctx.beginPath();
+        ctx.moveTo(winX - 22, winY - 12);
+        ctx.lineTo(winX + 24, winY - 12);
+        ctx.quadraticCurveTo(winX + 12, winY + winH * 0.5, winX + 30, winY + winH + 22);
+        ctx.lineTo(winX - 26, winY + winH + 22);
+        ctx.closePath();
+        ctx.fill();
+
+        const curtainGradR = ctx.createLinearGradient(winX + winW - 26, winY, winX + winW + 24, winY);
+        curtainGradR.addColorStop(0, '#663c39');
+        curtainGradR.addColorStop(0.5, '#99625d');
+        curtainGradR.addColorStop(1, '#7a4b47');
+        ctx.fillStyle = curtainGradR;
+        ctx.beginPath();
+        ctx.moveTo(winX + winW - 24, winY - 12);
+        ctx.lineTo(winX + winW + 22, winY - 12);
+        ctx.lineTo(winX + winW + 26, winY + winH + 22);
+        ctx.quadraticCurveTo(winX + winW - 12, winY + winH * 0.5, winX + winW - 30, winY + winH + 22);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = '#c49a6c';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(winX - 32, winY - 14);
+        ctx.lineTo(winX + winW + 32, winY - 14);
+        ctx.stroke();
+
+        // Bookshelf & warm lamp on right side
+        if (width > 560) {
+          const shelfW = 150;
+          const shelfH = Math.min(260, height * 0.4);
+          const shelfX = width - shelfW - Math.max(30, width * 0.1);
+          const shelfY = tableY - shelfH;
+
+          ctx.fillStyle = '#2b2019';
+          ctx.fillRect(shelfX, shelfY, shelfW, shelfH);
+          ctx.strokeStyle = '#3d2e24';
+          ctx.lineWidth = 5;
+          ctx.strokeRect(shelfX, shelfY, shelfW, shelfH);
+
+          const midShelfY = shelfY + shelfH * 0.52;
+          ctx.fillStyle = '#3d2e24';
+          ctx.fillRect(shelfX, midShelfY, shelfW, 6);
+
+          const bookColors = ['#8c4a47', '#4a6b5d', '#b88b58', '#52647a', '#7d5a50'];
+          let bx = shelfX + 12;
+          bookColors.forEach((col, i) => {
+            const bw = 14 + (i % 2) * 4;
+            const bh = 52 + (i % 3) * 8;
+            ctx.fillStyle = col;
+            ctx.fillRect(bx, midShelfY - bh, bw, bh);
+            bx += bw + 3;
+          });
+
+          const lampX = shelfX + shelfW * 0.5;
+          const lampY = shelfY;
+          const lampGlow = ctx.createRadialGradient(lampX, lampY - 28, 4, lampX, lampY - 28, 110);
+          lampGlow.addColorStop(0, 'rgba(255, 214, 153, 0.38)');
+          lampGlow.addColorStop(1, 'rgba(255, 214, 153, 0)');
+          ctx.fillStyle = lampGlow;
+          ctx.beginPath();
+          ctx.arc(lampX, lampY - 28, 110, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = '#b58967';
+          ctx.fillRect(lampX - 10, lampY - 6, 20, 6);
+          ctx.fillRect(lampX - 3, lampY - 22, 6, 16);
+
+          ctx.fillStyle = '#f5deb3';
+          ctx.beginPath();
+          ctx.moveTo(lampX - 16, lampY - 44);
+          ctx.lineTo(lampX + 16, lampY - 44);
+          ctx.lineTo(lampX + 24, lampY - 20);
+          ctx.lineTo(lampX - 24, lampY - 20);
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        // Sunlight beam
+        const beamGrad = ctx.createLinearGradient(winX, winY, width * 0.65, height);
+        beamGrad.addColorStop(0, 'rgba(255, 248, 232, 0.14)');
+        beamGrad.addColorStop(1, 'rgba(255, 248, 232, 0)');
+        ctx.fillStyle = beamGrad;
+        ctx.beginPath();
+        ctx.moveTo(winX, winY);
+        ctx.lineTo(winX + winW, winY);
+        ctx.lineTo(width * 0.85, height);
+        ctx.lineTo(width * 0.1, height);
+        ctx.closePath();
+        ctx.fill();
+
+        // Foreground wooden table
+        const tableGrad = ctx.createLinearGradient(0, tableY, 0, height);
+        tableGrad.addColorStop(0, '#6b4935');
+        tableGrad.addColorStop(0.15, '#593b2a');
+        tableGrad.addColorStop(1, '#2e1d14');
+        ctx.fillStyle = tableGrad;
+        ctx.fillRect(0, tableY, width, height - tableY);
+
+        ctx.fillStyle = '#875f47';
+        ctx.fillRect(0, tableY, width, 4);
+
+        ctx.strokeStyle = 'rgba(35, 20, 12, 0.25)';
+        ctx.lineWidth = 1.5;
+        for (let ty = tableY + 22; ty < height; ty += 26) {
+          ctx.beginPath();
+          ctx.moveTo(0, ty);
+          ctx.quadraticCurveTo(width * 0.5, ty + 4, width, ty - 2);
+          ctx.stroke();
+        }
+      }
+
+      // ---------------------------------------------------------
+      // REALISTIC CONTINENT COORDINATES [Longitude, Latitude]
+      // ---------------------------------------------------------
+      const WORLD_POLYGONS = [
+        [
+          [-78, 9], [-72, 12], [-61, 10], [-51, 2], [-44, -2], [-35, -6],
+          [-35, -10], [-39, -15], [-40, -21], [-48, -26], [-53, -33], [-57, -36],
+          [-62, -39], [-65, -43], [-66, -47], [-68, -52], [-67, -55], [-73, -54],
+          [-75, -47], [-72, -37], [-71, -29], [-70, -18], [-76, -14], [-81, -5],
+          [-79, 1], [-77, 8]
+        ],
+        [
+          [-168, 66], [-162, 70], [-140, 70], [-125, 70], [-110, 74], [-95, 74],
+          [-82, 70], [-78, 62], [-92, 57], [-79, 53], [-64, 60], [-55, 52],
+          [-60, 45], [-70, 42], [-76, 35], [-80, 25], [-83, 30], [-90, 29],
+          [-97, 26], [-96, 19], [-90, 21], [-87, 21], [-88, 16], [-83, 15],
+          [-84, 10], [-78, 8], [-85, 11], [-92, 15], [-105, 20], [-110, 24],
+          [-114, 31], [-117, 33], [-122, 37], [-124, 48], [-136, 58], [-150, 61],
+          [-162, 55], [-166, 60]
+        ],
+        [
+          [-44, 60], [-52, 65], [-58, 75], [-45, 82], [-22, 82], [-18, 76],
+          [-24, 68], [-37, 65]
+        ],
+        [
+          [-9, 37], [-9, 43], [-2, 43], [-5, 48], [2, 51], [8, 54], [9, 57],
+          [11, 54], [19, 54], [24, 59], [28, 60], [21, 61], [25, 65], [19, 64],
+          [14, 56], [11, 59], [5, 60], [8, 63], [16, 69], [28, 71], [40, 67],
+          [44, 66], [55, 68], [68, 70], [75, 72], [90, 75], [105, 77], [120, 73],
+          [140, 72], [160, 70], [178, 66], [163, 59], [156, 51], [142, 54],
+          [135, 44], [129, 41], [126, 35], [129, 35], [125, 40], [121, 39],
+          [118, 38], [122, 37], [121, 31], [119, 25], [114, 22], [108, 21],
+          [109, 13], [104, 10], [100, 13], [103, 2], [98, 8], [96, 16], [91, 22],
+          [86, 20], [80, 13], [77, 8], [72, 20], [68, 24], [61, 25], [56, 27],
+          [48, 30], [56, 24], [59, 22], [54, 17], [44, 13], [41, 20], [35, 28],
+          [34, 31], [36, 36], [27, 37], [26, 40], [29, 41], [40, 42], [38, 45],
+          [32, 46], [28, 44], [24, 40], [22, 37], [20, 40], [14, 45], [16, 41],
+          [18, 40], [15, 38], [12, 41], [9, 44], [5, 43], [3, 42], [0, 39],
+          [-5, 36]
+        ],
+        [
+          [-5, 50], [-5, 55], [-6, 58], [-2, 58], [1, 53], [1, 51]
+        ],
+        [
+          [-6, 36], [10, 37], [11, 33], [20, 32], [25, 31], [32, 31], [35, 27],
+          [43, 12], [51, 12], [49, 5], [41, -2], [40, -11], [35, -18], [35, -24],
+          [31, -30], [26, -34], [18, -34], [16, -28], [14, -22], [12, -15],
+          [12, -6], [9, 0], [9, 4], [3, 6], [-4, 5], [-8, 5], [-13, 9], [-17, 15],
+          [-17, 21], [-13, 27], [-9, 32]
+        ],
+        [
+          [49, -12], [50, -16], [47, -25], [44, -25], [44, -19], [46, -15]
+        ],
+        [
+          [130, 31], [135, 34], [140, 36], [141, 41], [145, 44], [140, 43],
+          [139, 38], [133, 35], [130, 33]
+        ],
+        [
+          [114, -22], [122, -18], [130, -12], [136, -12], [136, -15], [141, -17],
+          [142, -11], [146, -19], [153, -27], [150, -37], [144, -38], [138, -35],
+          [131, -32], [123, -34], [115, -34], [113, -26]
+        ],
+        [
+          [167, -46], [174, -41], [178, -37], [173, -35], [174, -40], [170, -45]
+        ]
+      ];
+
+      function projectGeo(lon, lat, mapX, mapY, mapW, mapH) {
+        const minLon = -170;
+        const maxLon = 180;
+        const maxLat = 82;
+        const minLat = -60;
+
+        const x = mapX + ((lon - minLon) / (maxLon - minLon)) * mapW;
+        const y = mapY + ((maxLat - lat) / (maxLat - minLat)) * mapH;
+        return [x, y];
+      }
+
+      function drawAirplane(x, y, angle) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+
+        const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, 24);
+        glow.addColorStop(0, 'rgba(255, 225, 180, 0.7)');
+        glow.addColorStop(1, 'rgba(255, 225, 180, 0)');
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(0, 0, 24, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#fbf6ee';
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+        ctx.shadowBlur = 4;
+        ctx.beginPath();
+        ctx.moveTo(14, 0);
+        ctx.lineTo(4, 2.5);
+        ctx.lineTo(-3, 13);
+        ctx.lineTo(-6, 13);
+        ctx.lineTo(-2, 2.5);
+        ctx.lineTo(-10, 2);
+        ctx.lineTo(-13, 6);
+        ctx.lineTo(-15, 6);
+        ctx.lineTo(-13, 0);
+        ctx.lineTo(-15, -6);
+        ctx.lineTo(-13, -6);
+        ctx.lineTo(-10, -2);
+        ctx.lineTo(-2, -2.5);
+        ctx.lineTo(-6, -13);
+        ctx.lineTo(-3, -13);
+        ctx.lineTo(4, -2.5);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.restore();
+      }
+
+      // ---------------------------------------------------------
+      // STAGE 1: FLIGHT (ARGENTINA -> RUSSIA)
+      // ---------------------------------------------------------
+      function drawTravelStage(elapsed) {
+        const bgGrad = ctx.createRadialGradient(width / 2, height * 0.45, 10, width / 2, height * 0.45, Math.max(width, height));
+        bgGrad.addColorStop(0, '#1c2a24');
+        bgGrad.addColorStop(1, '#090e0c');
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, width, height);
+
+        const duration = 5.5;
+        const rawProgress = Math.min(1, elapsed / duration);
+        const progress = rawProgress < 0.5
+          ? 4 * rawProgress * rawProgress * rawProgress
+          : 1 - Math.pow(-2 * rawProgress + 2, 3) / 2;
+
+        const kmLeft = Math.max(0, Math.round(15400 * (1 - progress)));
+        if (kmLeft > 0) {
+          distanceText.textContent = `In flight... ${kmLeft.toLocaleString('en-US')} km remaining`;
+        } else {
+          distanceText.textContent = `Arrived at destination!`;
+        }
+
+        const maxMapW = Math.min(width * 0.94, 920);
+        const maxMapH = height * 0.68;
+        let mapW = maxMapW;
+        let mapH = mapW * 0.48;
+        if (mapH > maxMapH) {
+          mapH = maxMapH;
+          mapW = mapH / 0.48;
+        }
+        const mapX = (width - mapW) / 2;
+        const mapY = (height - mapH) / 2 + 24;
+
+        ctx.save();
+
+        ctx.strokeStyle = 'rgba(130, 180, 155, 0.08)';
+        ctx.lineWidth = 1;
+        for (let lat = -40; lat <= 80; lat += 20) {
+          const [, gy] = projectGeo(0, lat, mapX, mapY, mapW, mapH);
+          ctx.beginPath();
+          ctx.moveTo(mapX, gy);
+          ctx.lineTo(mapX + mapW, gy);
+          ctx.stroke();
+        }
+        for (let lon = -150; lon <= 180; lon += 30) {
+          const [gx] = projectGeo(lon, 0, mapX, mapY, mapW, mapH);
+          ctx.beginPath();
+          ctx.moveTo(gx, mapY);
+          ctx.lineTo(gx, mapY + mapH);
+          ctx.stroke();
+        }
+
+        ctx.fillStyle = 'rgba(56, 94, 77, 0.36)';
+        ctx.strokeStyle = 'rgba(145, 200, 172, 0.35)';
+        ctx.lineWidth = 1.2;
+        ctx.lineJoin = 'round';
+
+        WORLD_POLYGONS.forEach(poly => {
+          ctx.beginPath();
+          poly.forEach(([lon, lat], idx) => {
+            const [px, py] = projectGeo(lon, lat, mapX, mapY, mapW, mapH);
+            if (idx === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+          });
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+        });
+
+        const [argX, argY] = projectGeo(-64, -36, mapX, mapY, mapW, mapH);
+        const [rusX, rusY] = projectGeo(44, 56.3, mapX, mapY, mapW, mapH);
+
+        const ctrlX = (argX + rusX) / 2 - mapW * 0.06;
+        const ctrlY = Math.min(argY, rusY) - mapH * 0.16;
+
+        ctx.setLineDash([4, 5]);
+        ctx.strokeStyle = 'rgba(232, 200, 169, 0.28)';
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.moveTo(argX, argY);
+        ctx.quadraticCurveTo(ctrlX, ctrlY, rusX, rusY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.strokeStyle = '#e8b88a';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        const steps = 70;
+        for (let i = 0; i <= steps * progress; i++) {
+          const t = i / steps;
+          const px = (1 - t) * (1 - t) * argX + 2 * (1 - t) * t * ctrlX + t * t * rusX;
+          const py = (1 - t) * (1 - t) * argY + 2 * (1 - t) * t * ctrlY + t * t * rusY;
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+
+        ctx.fillStyle = '#74c69d';
+        ctx.beginPath();
+        ctx.arc(argX, argY, 4.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#d4c4b5';
+        ctx.font = '12px Georgia';
+        ctx.fillText('Argentina', argX - 26, argY + 18);
+
+        const pulseR = 4.5 + Math.sin(elapsed * 6) * 2;
+        ctx.fillStyle = '#f4a261';
+        ctx.beginPath();
+        ctx.arc(rusX, rusY, pulseR, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#f3e9dc';
+        ctx.fillText('Russia (Ri)', rusX + 8, rusY + 4);
+
+        const curX = (1 - progress) * (1 - progress) * argX + 2 * (1 - progress) * progress * ctrlX + progress * progress * rusX;
+        const curY = (1 - progress) * (1 - progress) * argY + 2 * (1 - progress) * progress * ctrlY + progress * progress * rusY;
+
+        const dx = 2 * (1 - progress) * (ctrlX - argX) + 2 * progress * (rusX - ctrlX);
+        const dy = 2 * (1 - progress) * (ctrlY - argY) + 2 * progress * (rusY - ctrlY);
+        const angle = Math.atan2(dy, dx);
+
+        drawAirplane(curX, curY, angle);
+
+        ctx.restore();
+
+        if (rawProgress >= 1 && elapsed > duration + 0.7) {
+          state = 'PACKAGE';
+          stateStartTime = performance.now();
+          travelUI.classList.add('hidden');
+          packageUI.classList.add('visible');
+        }
+      }
+
+      // ---------------------------------------------------------
+      // STAGE 2: MAIN GIFT BOX ON HOME TABLE
+      // ---------------------------------------------------------
+      function drawGiftBox(cx, cy, scale, elapsed, ribbonColor, tagText, showGlow) {
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.scale(scale, scale);
+
+        if (showGlow) {
+          const pulse = 0.5 + 0.5 * Math.sin(elapsed * 3.4);
+          ctx.shadowColor = `rgba(255, 228, 185, ${0.35 + pulse * 0.45})`;
+          ctx.shadowBlur = 12 + pulse * 8;
+        }
+
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.42)';
+        ctx.beginPath();
+        ctx.ellipse(0, 68, 74, 14, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        const boxGrad = ctx.createLinearGradient(-65, -45, 65, 65);
+        boxGrad.addColorStop(0, '#dfb58c');
+        boxGrad.addColorStop(1, '#b58458');
+        ctx.fillStyle = boxGrad;
+        drawRoundedRect(-65, -45, 130, 110, 8);
+        ctx.fill();
+
+        ctx.shadowBlur = 0;
+
+        const lidGrad = ctx.createLinearGradient(-72, -62, 72, -38);
+        lidGrad.addColorStop(0, '#ebd0b3');
+        lidGrad.addColorStop(1, '#c7976b');
+        ctx.fillStyle = lidGrad;
+        ctx.shadowColor = 'rgba(0,0,0,0.35)';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetY = 3;
+        drawRoundedRect(-72, -62, 144, 26, 6);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetY = 0;
+
+        ctx.fillStyle = ribbonColor;
+        ctx.fillRect(-11, -62, 22, 127);
+        ctx.fillRect(-65, 2, 130, 18);
+
+        ctx.strokeStyle = ribbonColor;
+        ctx.lineWidth = 7;
+        ctx.beginPath();
+        ctx.ellipse(-18, -72, 18, 10, -0.35, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.ellipse(18, -72, 18, 10, 0.35, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.fillStyle = '#5c232c';
+        ctx.beginPath();
+        ctx.arc(0, -65, 8, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (tagText) {
+          ctx.save();
+          ctx.translate(18, -44);
+          ctx.rotate(0.18 + Math.sin(elapsed * 3) * 0.04);
+          const tagW = Math.max(58, tagText.length * 7.2 + 16);
+          ctx.fillStyle = '#fbf6ee';
+          drawRoundedRect(0, 0, tagW, 26, 4);
+          ctx.fill();
+          ctx.fillStyle = '#5e3434';
+          ctx.font = 'italic 12px Georgia';
+          ctx.fillText(tagText, 8, 17);
+          ctx.restore();
+        }
+
+        ctx.restore();
+      }
+
+      function drawPackageStage(elapsed) {
+        drawRoomBackground(elapsed);
+
+        const scaleIn = Math.min(1, elapsed / 0.7);
+        const ease = 1 - Math.pow(1 - scaleIn, 3);
+        const floatY = Math.sin(elapsed * 2.5) * 4;
+
+        const cx = width / 2;
+        const tableY = height * 0.72;
+        const cy = tableY - 40 + floatY;
+
+        drawGiftBox(cx, cy, ease, elapsed, '#8c3b47', 'Для Ри', false);
+      }
+
+      openBtn.addEventListener('click', () => {
+        if (state !== 'PACKAGE') return;
+
+        spawnCelebration(width / 2, height * 0.65, 65);
+
+        state = 'GARDEN';
+        stateStartTime = performance.now();
+        catPaw.nextSpawn = performance.now() + 4500;
+        packageUI.classList.remove('visible');
+        setTimeout(() => {
+          packageUI.style.display = 'none';
+          gardenUI.classList.add('visible');
+        }, 400);
+
+        addFlowerToPot();
+      });
+
+      // ---------------------------------------------------------
+      // STAGE 3: INTERACTIVE POT + EXTRA GIFT (MATE) + ENVELOPE
+      // ---------------------------------------------------------
+      const grownFlowers = [];
+      const maxFlowers = 21;
+      const flowerHues = [345, 42, 330, 15, 275, 355, 25];
+      const flowerTypes = ['ROSE', 'TULIP', 'DAISY', 'LILY'];
+
+      const slots = [
+        { ox: 0,    oy: -165, scale: 1.12 },
+        { ox: -55,  oy: -145, scale: 1.0  },
+        { ox: 55,   oy: -145, scale: 1.0  },
+        { ox: -95,  oy: -105, scale: 0.92 },
+        { ox: 95,   oy: -105, scale: 0.92 },
+        { ox: -32,  oy: -110, scale: 0.96 },
+        { ox: 34,   oy: -110, scale: 0.96 },
+        { ox: -125, oy: -65,  scale: 0.85 },
+        { ox: 125,  oy: -65,  scale: 0.85 },
+        { ox: -72,  oy: -72,  scale: 0.9  },
+        { ox: 72,   oy: -72,  scale: 0.9  },
+        { ox: 0,    oy: -78,  scale: 0.95 },
+        { ox: -110, oy: -155, scale: 0.88 },
+        { ox: 110,  oy: -155, scale: 0.88 },
+        { ox: -35,  oy: -195, scale: 0.95 },
+        { ox: 38,   oy: -195, scale: 0.95 },
+        { ox: -85,  oy: -185, scale: 0.86 },
+        { ox: 85,   oy: -185, scale: 0.86 },
+        { ox: -145, oy: -115, scale: 0.82 },
+        { ox: 145,  oy: -115, scale: 0.82 },
+        { ox: 0,    oy: -220, scale: 1.0  }
+      ];
+
+      function addFlowerToPot() {
+        if (grownFlowers.length >= maxFlowers) return;
+        const idx = grownFlowers.length;
+        const slot = slots[idx];
+        grownFlowers.push({
+          ox: slot.ox + (Math.random() - 0.5) * 10,
+          oy: slot.oy + (Math.random() - 0.5) * 10,
+          scale: slot.scale,
+          hue: flowerHues[idx % flowerHues.length],
+          type: flowerTypes[idx % flowerTypes.length],
+          bornAt: performance.now(),
+          leafSide: idx % 2 === 0 ? -1 : 1,
+          swayPhase: Math.random() * Math.PI * 2
+        });
+      }
+
+      let envelopeHitbox = { x: 0, y: 0, w: 0, h: 0, active: false };
+      let extraGiftHitbox = { x: 0, y: 0, w: 0, h: 0, active: false };
+
+      function isInsideBox(clientX, clientY, box, pad = 12) {
+        if (!box.active) return false;
+        return (
+          clientX >= box.x - pad &&
+          clientX <= box.x + box.w + pad &&
+          clientY >= box.y - pad &&
+          clientY <= box.y + box.h + pad
+        );
+      }
+
+      canvas.addEventListener('pointermove', () => {
+        canvas.style.cursor = state === 'GARDEN' ? 'pointer' : 'default';
+      });
+
+      canvas.addEventListener('pointerdown', (e) => {
+        if (state !== 'GARDEN') return;
+        if (backdrop.classList.contains('open')) return;
+
+        // 0. Check if user tapped the curious black cat paw
+        if (isInsideBox(e.clientX, e.clientY, catPawHitbox, 10)) {
+          if (catPaw.active && !catPaw.startled) {
+            catPaw.startled = true;
+            catPaw.startleTime = performance.now();
+          }
+          return;
+        }
+
+        // 1. Check envelope click
+        if (isInsideBox(e.clientX, e.clientY, envelopeHitbox, 12)) {
+          backdrop.classList.add('open');
+          return;
+        }
+
+        // 2. Check extra gift box or mate click
+        if (isInsideBox(e.clientX, e.clientY, extraGiftHitbox, 12)) {
+          if (extraGiftState === 'BOX') {
+            extraGiftState = 'MATE';
+            extraGiftTime = performance.now();
+            spawnCelebration(extraGiftHitbox.x + extraGiftHitbox.w / 2, extraGiftHitbox.y + 10, 42);
+            document.getElementById('garden-hint').textContent = 'Tap the mate to sip • Tap anywhere for flowers • Tap envelope to read';
+          } else {
+            lastMateSipTime = performance.now();
+            playMateSipSound();
+          }
+          return;
+        }
+
+        // 3. Otherwise grow another flower in the pot
+        addFlowerToPot();
+      });
+
+      function drawLeaf(x, y, angle, size, progress) {
+        if (progress <= 0) return;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        ctx.scale(progress, progress);
+
+        const grad = ctx.createLinearGradient(0, 0, size, 0);
+        grad.addColorStop(0, '#1e3a29');
+        grad.addColorStop(1, '#3b6e4c');
+
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.bezierCurveTo(size * 0.3, -size * 0.4, size * 0.8, -size * 0.3, size, 0);
+        ctx.bezierCurveTo(size * 0.8, size * 0.3, size * 0.3, size * 0.4, 0, 0);
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(130, 180, 140, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(size * 0.85, 0);
+        ctx.stroke();
+
+        ctx.restore();
+      }
+
+      function drawRoseHead(hue, bloomProgress, time) {
+        const layers = 4;
+        for (let l = layers; l >= 1; l--) {
+          const petalsCount = l * 5;
+          const radius = l * 13 * bloomProgress;
+          const lightness = 30 + (layers - l) * 12;
+
+          for (let i = 0; i < petalsCount; i++) {
+            const angle = (i / petalsCount) * Math.PI * 2 + l * 0.4 + Math.sin(time + l) * 0.02;
+            ctx.save();
+            ctx.rotate(angle);
+
+            const grad = ctx.createRadialGradient(0, 0, 2, 0, -radius * 0.5, radius * 1.4);
+            grad.addColorStop(0, `hsl(${hue}, 65%, ${lightness - 15}%)`);
+            grad.addColorStop(0.7, `hsl(${hue}, 75%, ${lightness}%)`);
+            grad.addColorStop(1, `hsl(${hue + 8}, 80%, ${lightness + 15}%)`);
+
+            ctx.fillStyle = grad;
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+            ctx.shadowBlur = 5;
+            ctx.shadowOffsetY = 2;
+
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.bezierCurveTo(-radius * 0.6, -radius * 0.6, -radius * 0.5, -radius * 1.3, 0, -radius * 1.35);
+            ctx.bezierCurveTo(radius * 0.5, -radius * 1.3, radius * 0.6, -radius * 0.6, 0, 0);
+            ctx.fill();
+            ctx.restore();
+          }
+        }
+        const centerGrad = ctx.createRadialGradient(0, 0, 1, 0, 0, 9);
+        centerGrad.addColorStop(0, '#f4d35e');
+        centerGrad.addColorStop(1, '#ee964b');
+        ctx.fillStyle = centerGrad;
+        ctx.beginPath();
+        ctx.arc(0, 0, 7 * bloomProgress, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      function drawTulipHead(hue, bloomProgress) {
+        const h = 44 * bloomProgress;
+        const w = 26 * bloomProgress;
+
+        ctx.fillStyle = `hsl(${hue}, 72%, 38%)`;
+        ctx.beginPath();
+        ctx.moveTo(0, 4);
+        ctx.bezierCurveTo(-w * 0.8, -h * 0.3, -w * 0.5, -h * 1.15, 0, -h * 1.12);
+        ctx.bezierCurveTo(w * 0.5, -h * 1.15, w * 0.8, -h * 0.3, 0, 4);
+        ctx.fill();
+
+        [-1, 1].forEach(side => {
+          const grad = ctx.createLinearGradient(0, 0, side * w, -h);
+          grad.addColorStop(0, `hsl(${hue}, 78%, 45%)`);
+          grad.addColorStop(1, `hsl(${hue + 10}, 85%, 66%)`);
+          ctx.fillStyle = grad;
+          ctx.shadowColor = 'rgba(0,0,0,0.3)';
+          ctx.shadowBlur = 4;
+
+          ctx.beginPath();
+          ctx.moveTo(0, 5);
+          ctx.bezierCurveTo(side * w * 1.25, -h * 0.1, side * w * 1.1, -h * 0.95, side * w * 0.22, -h * 1.05);
+          ctx.bezierCurveTo(side * w * 0.1, -h * 0.5, 0, -h * 0.2, 0, 5);
+          ctx.fill();
+        });
+
+        const frontGrad = ctx.createLinearGradient(0, 5, 0, -h);
+        frontGrad.addColorStop(0, `hsl(${hue}, 75%, 48%)`);
+        frontGrad.addColorStop(1, `hsl(${hue + 12}, 88%, 70%)`);
+        ctx.fillStyle = frontGrad;
+        ctx.beginPath();
+        ctx.moveTo(0, 5);
+        ctx.bezierCurveTo(-w * 0.65, -h * 0.25, -w * 0.45, -h * 0.95, 0, -h);
+        ctx.bezierCurveTo(w * 0.45, -h * 0.95, w * 0.65, -h * 0.25, 0, 5);
+        ctx.fill();
+      }
+
+      function drawDaisyHead(hue, bloomProgress, time) {
+        const petals = 14;
+        const len = 36 * bloomProgress;
+        for (let i = 0; i < petals; i++) {
+          const angle = (i / petals) * Math.PI * 2 + Math.sin(time * 1.2) * 0.03;
+          ctx.save();
+          ctx.rotate(angle);
+
+          const grad = ctx.createLinearGradient(0, 0, 0, -len);
+          grad.addColorStop(0, `hsl(${hue}, 65%, 55%)`);
+          grad.addColorStop(0.6, `hsl(${hue}, 35%, 88%)`);
+          grad.addColorStop(1, '#fffdf9');
+
+          ctx.fillStyle = grad;
+          ctx.shadowColor = 'rgba(0,0,0,0.25)';
+          ctx.shadowBlur = 3;
+
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.bezierCurveTo(-5 * bloomProgress, -len * 0.4, -4 * bloomProgress, -len * 0.95, 0, -len);
+          ctx.bezierCurveTo(4 * bloomProgress, -len * 0.95, 5 * bloomProgress, -len * 0.4, 0, 0);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        const cGrad = ctx.createRadialGradient(-2, -2, 1, 0, 0, 11 * bloomProgress);
+        cGrad.addColorStop(0, '#ffd166');
+        cGrad.addColorStop(0.7, '#e09f3e');
+        cGrad.addColorStop(1, '#9e5a14');
+        ctx.fillStyle = cGrad;
+        ctx.beginPath();
+        ctx.arc(0, 0, 10 * bloomProgress, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      function drawLilyHead(hue, bloomProgress, time) {
+        const petals = 6;
+        const len = 42 * bloomProgress;
+        for (let i = 0; i < petals; i++) {
+          const angle = (i / petals) * Math.PI * 2 + 0.25;
+          ctx.save();
+          ctx.rotate(angle);
+
+          const grad = ctx.createLinearGradient(0, 0, 0, -len);
+          grad.addColorStop(0, `hsl(${hue}, 75%, 36%)`);
+          grad.addColorStop(0.55, `hsl(${hue}, 82%, 58%)`);
+          grad.addColorStop(1, `hsl(${hue + 14}, 90%, 78%)`);
+
+          ctx.fillStyle = grad;
+          ctx.shadowColor = 'rgba(0,0,0,0.3)';
+          ctx.shadowBlur = 4;
+
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.bezierCurveTo(-11 * bloomProgress, -len * 0.35, -8 * bloomProgress, -len * 0.85, 0, -len);
+          ctx.bezierCurveTo(8 * bloomProgress, -len * 0.85, 11 * bloomProgress, -len * 0.35, 0, 0);
+          ctx.fill();
+
+          ctx.strokeStyle = `hsla(${hue - 10}, 70%, 30%, 0.45)`;
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.moveTo(0, -3);
+          ctx.lineTo(0, -len * 0.78);
+          ctx.stroke();
+
+          ctx.restore();
+        }
+
+        for (let s = 0; s < 5; s++) {
+          const sAng = (s / 5) * Math.PI * 2 + Math.sin(time + s) * 0.05;
+          const sx = Math.cos(sAng) * 14 * bloomProgress;
+          const sy = Math.sin(sAng) * 14 * bloomProgress;
+          ctx.strokeStyle = '#f4e285';
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(sx, sy);
+          ctx.stroke();
+
+          ctx.fillStyle = '#bc4749';
+          ctx.beginPath();
+          ctx.arc(sx, sy, 2 * bloomProgress, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      function drawFlowerHead(x, y, scale, hue, type, bloomProgress, time) {
+        if (bloomProgress <= 0) return;
+        ctx.save();
+        ctx.translate(x, y);
+        const currentScale = scale * (0.2 + 0.8 * bloomProgress);
+        ctx.scale(currentScale, currentScale);
+
+        if (type === 'TULIP') {
+          drawTulipHead(hue, bloomProgress);
+        } else if (type === 'DAISY') {
+          drawDaisyHead(hue, bloomProgress, time);
+        } else if (type === 'LILY') {
+          drawLilyHead(hue, bloomProgress, time);
+        } else {
+          drawRoseHead(hue, bloomProgress, time);
+        }
+
+        ctx.restore();
+      }
+
+      // Draw Prepared Argentine Mate with Bombilla
+      function drawPreparedMate(mx, my, now, elapsed) {
+        const age = (now - extraGiftTime) / 1000;
+        const popScale = Math.min(1, age / 0.45);
+        const easePop = 1 - Math.pow(1 - popScale, 3);
+
+        const sipAge = (now - lastMateSipTime) / 1000;
+        const sipActive = sipAge >= 0 && sipAge < 1.25;
+        const sipTilt = sipActive ? Math.sin(sipAge * Math.PI * 4) * 0.06 : 0;
+        const sipBounce = sipActive ? Math.sin(sipAge * Math.PI) * -4 : 0;
+
+        ctx.save();
+        ctx.translate(mx, my + sipBounce);
+        ctx.rotate(sipTilt);
+        ctx.scale(easePop, easePop);
+
+        ctx.fillStyle = 'rgba(20, 10, 5, 0.45)';
+        ctx.beginPath();
+        ctx.ellipse(0, 26, 28, 7, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.save();
+        ctx.rotate(0.32);
+        const strawGrad = ctx.createLinearGradient(-3, -54, 3, -54);
+        strawGrad.addColorStop(0, '#9aa5b1');
+        strawGrad.addColorStop(0.5, '#f5f7fa');
+        strawGrad.addColorStop(1, '#7b8794');
+        ctx.fillStyle = strawGrad;
+        drawRoundedRect(-2.5, -56, 5, 42, 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#d4a373';
+        ctx.fillRect(-3.5, -36, 7, 4);
+        ctx.restore();
+
+        const gourdGrad = ctx.createRadialGradient(-8, 4, 3, 0, 6, 30);
+        gourdGrad.addColorStop(0, '#9c5a34');
+        gourdGrad.addColorStop(0.65, '#6e3b1e');
+        gourdGrad.addColorStop(1, '#3d1e0d');
+        ctx.fillStyle = gourdGrad;
+
+        ctx.beginPath();
+        ctx.moveTo(-20, -14);
+        ctx.bezierCurveTo(-30, -2, -26, 22, -13, 25);
+        ctx.lineTo(13, 25);
+        ctx.bezierCurveTo(26, 22, 30, -2, 20, -14);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = '#4f772d';
+        ctx.beginPath();
+        ctx.ellipse(0, -15, 19, 7, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#90a955';
+        for (let y = -17; y <= -12; y += 2) {
+          for (let x = -12; x <= 12; x += 4) {
+            ctx.fillRect(x + (y % 2), y, 2, 1.5);
+          }
+        }
+
+        const rimGrad = ctx.createLinearGradient(-22, -16, 22, -16);
+        rimGrad.addColorStop(0, '#828d99');
+        rimGrad.addColorStop(0.45, '#e4e7eb');
+        rimGrad.addColorStop(1, '#616e7c');
+        ctx.fillStyle = rimGrad;
+        drawRoundedRect(-21, -17, 42, 6, 2.5);
+        ctx.fill();
+
+        steamParticles.forEach((sp, i) => {
+          const cycle = ((elapsed * sp.speed + i * 0.25) % 1);
+          const sx = Math.sin(elapsed * 2 + sp.offset) * 6 - 4;
+          const sy = -22 - cycle * 32;
+          const alpha = Math.sin(cycle * Math.PI) * (sipActive ? 0.55 : 0.28);
+
+          ctx.fillStyle = `rgba(255, 250, 240, ${alpha})`;
+          ctx.beginPath();
+          ctx.arc(sx, sy, 2.5 + cycle * 3, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        if (sipActive) {
+          const textAlpha = Math.sin(Math.min(1, sipAge / 1.25) * Math.PI);
+          ctx.fillStyle = `rgba(255, 245, 225, ${textAlpha})`;
+          ctx.font = 'italic 12px Georgia';
+          ctx.textAlign = 'center';
+          ctx.fillText('mmm... mate!', 0, -64 - sipAge * 10);
+          ctx.textAlign = 'left';
+        }
+
+        ctx.restore();
+
+        extraGiftHitbox = {
+          x: mx - 30,
+          y: my - 56,
+          w: 60,
+          h: 84,
+          active: true
+        };
+      }
+
+      // ---------------------------------------------------------
+      // CURIOUS BLACK CAT PAW REACHING ONTO THE TABLE
+      // ---------------------------------------------------------
+      function updateAndDrawCatPaw(now, baseX, tableSurfaceY) {
+        if (!catPaw.active) {
+          catPawHitbox.active = false;
+          if (now >= catPaw.nextSpawn && !backdrop.classList.contains('open')) {
+            catPaw.active = true;
+            catPaw.startTime = now;
+            catPaw.startled = false;
+            const targets = ['LEFT', 'POT', 'RIGHT'];
+            catPaw.targetType = targets[Math.floor(Math.random() * targets.length)];
+            catPaw.tilt = (Math.random() - 0.5) * 0.35;
+          }
+          return;
+        }
+
+        // Determine target X & Y on the table
+        const sideOffset = Math.min(125, width * 0.25);
+        let targetX = baseX;
+        let targetY = tableSurfaceY - 22;
+
+        if (catPaw.targetType === 'LEFT') {
+          targetX = baseX - sideOffset;
+          targetY = tableSurfaceY - 20;
+        } else if (catPaw.targetType === 'RIGHT') {
+          targetX = baseX + sideOffset;
+          targetY = tableSurfaceY - 26;
+        } else {
+          targetX = baseX + 18;
+          targetY = tableSurfaceY - 35;
+        }
+
+        const startY = height + 75;
+        let curY = startY;
+        let pokeOffset = 0;
+
+        if (catPaw.startled) {
+          const sElapsed = (now - catPaw.startleTime) / 1000;
+          const retract = Math.min(1, sElapsed / 0.28);
+          curY = targetY + (startY - targetY) * (retract * retract);
+          if (retract >= 1) {
+            catPaw.active = false;
+            catPaw.nextSpawn = now + 8000 + Math.random() * 5000;
+            return;
+          }
+        } else {
+          const elapsed = (now - catPaw.startTime) / 1000;
+          const d = catPaw.duration;
+
+          if (elapsed < 1.2) {
+            // Sneaking up slowly
+            const t = elapsed / 1.2;
+            const ease = 1 - Math.pow(1 - t, 3);
+            curY = startY + (targetY - startY) * ease;
+          } else if (elapsed < d - 1.0) {
+            // Hovering & gently tapping the item twice
+            const tapTime = elapsed - 1.2;
+            pokeOffset = -Math.abs(Math.sin(tapTime * Math.PI * 1.4)) * 14;
+            curY = targetY + pokeOffset;
+          } else if (elapsed < d) {
+            // Retreating back down under the table
+            const t = (elapsed - (d - 1.0)) / 1.0;
+            const ease = t * t;
+            curY = targetY + (startY - targetY) * ease;
+          } else {
+            catPaw.active = false;
+            catPaw.nextSpawn = now + 7000 + Math.random() * 4500;
+            return;
+          }
+        }
+
+        // Draw Black Cat Arm & Paw
+        ctx.save();
+        ctx.translate(targetX, curY);
+        ctx.rotate(catPaw.tilt);
+
+        // Soft shadow on table under paw
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+        ctx.beginPath();
+        ctx.ellipse(6, 15, 22, 12, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Furry black foreleg extending down off-screen
+        const armGrad = ctx.createLinearGradient(-18, 0, 18, 0);
+        armGrad.addColorStop(0, '#0c0c0e');
+        armGrad.addColorStop(0.45, '#1e1e24');
+        armGrad.addColorStop(1, '#09090b');
+
+        ctx.fillStyle = armGrad;
+        ctx.beginPath();
+        ctx.moveTo(-16, 12);
+        ctx.lineTo(-19, 260);
+        ctx.lineTo(19, 260);
+        ctx.lineTo(16, 12);
+        ctx.closePath();
+        ctx.fill();
+
+        // Subtle fur tuft highlights along edges
+        ctx.strokeStyle = '#2b2b33';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(-16, 25);
+        ctx.lineTo(-20, 32);
+        ctx.moveTo(16, 42);
+        ctx.lineTo(20, 49);
+        ctx.moveTo(-17, 68);
+        ctx.lineTo(-21, 75);
+        ctx.stroke();
+
+        // Rounded cat paw (4 toes)
+        ctx.fillStyle = '#16161b';
+        const toes = [
+          { x: -13, y: -4, rx: 6.5, ry: 8.5, rot: -0.25 },
+          { x: -4.5, y: -9, rx: 6.8, ry: 9.5, rot: -0.08 },
+          { x: 4.5, y: -9, rx: 6.8, ry: 9.5, rot: 0.08 },
+          { x: 13, y: -4, rx: 6.5, ry: 8.5, rot: 0.25 }
+        ];
+
+        toes.forEach(t => {
+          ctx.save();
+          ctx.translate(t.x, t.y);
+          ctx.rotate(t.rot);
+          ctx.beginPath();
+          ctx.ellipse(0, 0, t.rx, t.ry, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Cute subtle pink toe bean peeking at the tip
+          ctx.fillStyle = '#d98a9c';
+          ctx.beginPath();
+          ctx.ellipse(0, -3.5, 3.2, 4, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#16161b';
+          ctx.restore();
+        });
+
+        // Main paw palm base
+        ctx.fillStyle = '#16161b';
+        ctx.beginPath();
+        ctx.ellipse(0, 4, 17, 13, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Central pink paw pad peeking slightly
+        ctx.fillStyle = '#c97689';
+        ctx.beginPath();
+        ctx.ellipse(0, 3, 7.5, 5.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+
+        catPawHitbox = {
+          x: targetX - 24,
+          y: curY - 22,
+          w: 48,
+          h: 120,
+          active: true
+        };
+      }
+
+      // Draw Pot + Extra Gift (Box or Mate) + Envelope on Table
+      function drawTableItems(baseX, rimY, now, elapsed) {
+        const potTopW = 116;
+        const potBotW = 82;
+        const potH = 95;
+        const tableSurfaceY = rimY + potH;
+
+        ctx.save();
+
+        // 1. Pot shadow & body
+        ctx.fillStyle = 'rgba(20, 10, 5, 0.48)';
+        ctx.beginPath();
+        ctx.ellipse(baseX, tableSurfaceY + 4, 64, 13, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        const bodyGrad = ctx.createLinearGradient(baseX - potTopW / 2, rimY, baseX + potTopW / 2, tableSurfaceY);
+        bodyGrad.addColorStop(0, '#c97b59');
+        bodyGrad.addColorStop(0.5, '#a85d3c');
+        bodyGrad.addColorStop(1, '#7a3f26');
+
+        ctx.fillStyle = bodyGrad;
+        ctx.beginPath();
+        ctx.moveTo(baseX - potTopW / 2 + 6, rimY + 16);
+        ctx.lineTo(baseX + potTopW / 2 - 6, rimY + 16);
+        ctx.lineTo(baseX + potBotW / 2, tableSurfaceY);
+        ctx.lineTo(baseX - potBotW / 2, tableSurfaceY);
+        ctx.closePath();
+        ctx.fill();
+
+        const rimGrad = ctx.createLinearGradient(baseX - potTopW / 2, rimY, baseX + potTopW / 2, rimY + 20);
+        rimGrad.addColorStop(0, '#d88c6a');
+        rimGrad.addColorStop(1, '#944d30');
+        ctx.fillStyle = rimGrad;
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+        ctx.shadowBlur = 6;
+        ctx.shadowOffsetY = 3;
+        drawRoundedRect(baseX - potTopW / 2 - 4, rimY, potTopW + 8, 20, 6);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetY = 0;
+
+        // 2. Left side of pot: Extra Gift Box -> Prepared Mate
+        const leftX = baseX - Math.min(125, width * 0.25);
+        if (extraGiftState === 'BOX') {
+          const dropIn = Math.min(1, elapsed / 0.65);
+          const easeDrop = 1 - Math.pow(1 - dropIn, 3);
+          const boxCenterY = tableSurfaceY - 28 - (1 - easeDrop) * 45;
+          const smallScale = 0.52 * easeDrop;
+
+          drawGiftBox(leftX, boxCenterY, smallScale, elapsed, '#3a6b56', 'Extra gift', true);
+
+          extraGiftHitbox = {
+            x: leftX - 42,
+            y: boxCenterY - 40,
+            w: 84,
+            h: 78,
+            active: true
+          };
+        } else {
+          drawPreparedMate(leftX, tableSurfaceY - 22, now, elapsed);
+        }
+
+        // 3. Right side of pot: Envelope
+        const envW = 82;
+        const envH = 54;
+        const envX = baseX + Math.min(125, width * 0.25);
+        const envY = tableSurfaceY - 34;
+        const pulse = 0.5 + 0.5 * Math.sin(elapsed * 3.2);
+
+        ctx.save();
+        ctx.translate(envX, envY);
+        ctx.rotate(-0.08);
+
+        ctx.shadowColor = `rgba(255, 232, 195, ${0.35 + pulse * 0.45})`;
+        ctx.shadowBlur = 10 + pulse * 8;
+        ctx.shadowOffsetY = 4;
+
+        const envGrad = ctx.createLinearGradient(-envW / 2, -envH / 2, envW / 2, envH / 2);
+        envGrad.addColorStop(0, '#fbf6ee');
+        envGrad.addColorStop(1, '#e6d7c1');
+        ctx.fillStyle = envGrad;
+        drawRoundedRect(-envW / 2, -envH / 2, envW, envH, 5);
+        ctx.fill();
+
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetY = 0;
+
+        ctx.strokeStyle = 'rgba(155, 125, 95, 0.45)';
+        ctx.lineWidth = 1.3;
+        ctx.beginPath();
+        ctx.moveTo(-envW / 2 + 2, -envH / 2 + 2);
+        ctx.lineTo(0, 4);
+        ctx.lineTo(envW / 2 - 2, -envH / 2 + 2);
+        ctx.moveTo(-envW / 2 + 2, envH / 2 - 2);
+        ctx.lineTo(-10, -2);
+        ctx.moveTo(envW / 2 - 2, envH / 2 - 2);
+        ctx.lineTo(10, -2);
+        ctx.stroke();
+
+        // Red wax seal
+        ctx.fillStyle = '#9e2a2b';
+        ctx.beginPath();
+        ctx.arc(0, 3, 8.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#c44536';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(0, 3, 6, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.fillStyle = '#5c473e';
+        ctx.font = 'italic 10px Georgia';
+        ctx.fillText('Для Ри', -envW / 2 + 8, envH / 2 - 7);
+
+        ctx.restore();
+
+        envelopeHitbox = {
+          x: envX - envW / 2 - 6,
+          y: envY - envH / 2 - 6,
+          w: envW + 12,
+          h: envH + 12,
+          active: true
+        };
+
+        ctx.restore();
+
+        // 4. Curious Black Cat Paw in foreground
+        updateAndDrawCatPaw(now, baseX, tableSurfaceY);
+      }
+
+      function drawGardenStage(now, elapsed) {
+        drawRoomBackground(elapsed);
+
+        const baseX = width / 2;
+        const rimY = height * 0.72 - 36;
+
+        grownFlowers.forEach((f) => {
+          const age = (now - f.bornAt) / 1000;
+          const stemProg = Math.min(1, age / 0.9);
+          const bloomProg = Math.min(1, Math.max(0, (age - 0.5) / 1.0));
+
+          const easeStem = 1 - Math.pow(1 - stemProg, 3);
+          const easeBloom = 1 - Math.pow(1 - bloomProg, 3);
+
+          const sway = Math.sin(elapsed * 1.6 + f.swayPhase) * 5 * easeStem;
+          const targetX = baseX + f.ox + sway;
+          const targetY = rimY + f.oy;
+
+          const curX = baseX + (targetX - baseX) * easeStem;
+          const curY = (rimY + 8) + (targetY - (rimY + 8)) * easeStem;
+
+          ctx.strokeStyle = '#2d5a3f';
+          ctx.lineWidth = 3.8 * f.scale;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(baseX + f.ox * 0.18, rimY + 8);
+          ctx.quadraticCurveTo(
+            baseX + f.ox * 0.35,
+            rimY + f.oy * 0.45,
+            curX,
+            curY
+          );
+          ctx.stroke();
+
+          if (easeStem > 0.45) {
+            const leafProg = (easeStem - 0.45) / 0.55;
+            const midX = baseX + (curX - baseX) * 0.55;
+            const midY = (rimY + 8) + (curY - (rimY + 8)) * 0.55;
+            drawLeaf(midX, midY, f.leafSide === 1 ? -0.55 : -2.55, 40 * f.scale, leafProg);
+          }
+
+          drawFlowerHead(curX, curY, f.scale, f.hue, f.type, easeBloom, elapsed);
+        });
+
+        drawTableItems(baseX, rimY, now, elapsed);
+      }
+
+      function loop(now) {
+        const elapsed = (now - stateStartTime) / 1000;
+        ctx.clearRect(0, 0, width, height);
+
+        if (state === 'TRAVEL') {
+          drawTravelStage(elapsed);
+        } else if (state === 'PACKAGE') {
+          drawPackageStage(elapsed);
+        } else if (state === 'GARDEN') {
+          drawGardenStage(now, elapsed);
+        }
+
+        updateAndDrawStreamers(now);
+
+        requestAnimationFrame(loop);
+      }
+
+      requestAnimationFrame(loop);
+    });
+  </script>
+</body>
+</html>
