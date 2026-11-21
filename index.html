@@ -2,11 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Для Ри — For Ri</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body {
+      position: fixed;
+      inset: 0;
       width: 100%;
       height: 100%;
       background: #141d19;
@@ -14,12 +16,14 @@
       font-family: 'Georgia', serif;
       color: #f3e9dc;
       user-select: none;
+      -webkit-user-select: none;
       -webkit-tap-highlight-color: transparent;
     }
     canvas {
       display: block;
-      width: 100vw;
-      height: 100vh;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
     }
 
     /* Superposed UI */
@@ -241,10 +245,10 @@
       const CARTA_CONFIG = {
         titulo: "Для Ри / For Ri",
         parrafos: [
-          "I had the idea to make you this page, I hope you like it hahaha",
-          "I love you so much my dear Ri))"
+          "Even though more than 15,000 kilometers separate Argentina and Russia, I wanted to send you something that could reach you today.",
+          "Every tap grows a new flower, and I also included a traditional Argentine mate so we can share a virtual break together. I hope this brings a smile to your face."
         ],
-        firma: "Tomasik from Argentina <3"
+        firma: "Warmly, from Argentina"
       };
       // =========================================================
 
@@ -316,24 +320,39 @@
           gain.connect(audioCtx.destination);
           source.start();
         } catch (err) {
-          // Audio fallback silently ignored if blocked
+          // Audio fallback silently ignored
         }
       }
 
       // ---------------------------------------------------------
-      // CANVAS & SCENE SETUP
+      // CANVAS & 1:1 COORDINATE MAPPING (CSS PIXELS)
       // ---------------------------------------------------------
       const canvas = document.getElementById('scene');
       const ctx = canvas.getContext('2d');
-      let width = window.innerWidth;
-      let height = window.innerHeight;
+      let width = 0;
+      let height = 0;
 
-      function resize() {
-        width = canvas.width = window.innerWidth || document.documentElement.clientWidth;
-        height = canvas.height = window.innerHeight || document.documentElement.clientHeight;
+      function syncCanvasSize() {
+        const rect = canvas.getBoundingClientRect();
+        const newW = Math.round(rect.width) || window.innerWidth;
+        const newH = Math.round(rect.height) || window.innerHeight;
+        if (width !== newW || height !== newH) {
+          width = canvas.width = newW;
+          height = canvas.height = newH;
+        }
       }
-      window.addEventListener('resize', resize);
-      resize();
+
+      syncCanvasSize();
+      window.addEventListener('resize', syncCanvasSize);
+
+      function getPointerPos(e) {
+        syncCanvasSize();
+        const rect = canvas.getBoundingClientRect();
+        return {
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top
+        };
+      }
 
       // States: 'TRAVEL' -> 'PACKAGE' -> 'GARDEN'
       let state = 'TRAVEL';
@@ -350,12 +369,11 @@
         nextSpawn: performance.now() + 5000,
         startTime: 0,
         duration: 4.4,
-        targetType: 'POT', // 'LEFT', 'POT', 'RIGHT'
+        targetType: 'POT',
         tilt: 0.15,
         startled: false,
         startleTime: 0
       };
-      let catPawHitbox = { x: 0, y: 0, w: 0, h: 0, active: false };
 
       const travelUI = document.getElementById('travel-ui');
       const distanceText = document.getElementById('distance-text');
@@ -461,12 +479,11 @@
       }
 
       // ---------------------------------------------------------
-      // COZY HOME ROOM BACKGROUND (Window, Furniture & Wooden Table)
+      // COZY HOME ROOM BACKGROUND
       // ---------------------------------------------------------
       function drawRoomBackground(elapsed) {
         const tableY = height * 0.72;
 
-        // Warm interior wall
         const wallGrad = ctx.createLinearGradient(0, 0, 0, tableY);
         wallGrad.addColorStop(0, '#3b332d');
         wallGrad.addColorStop(0.6, '#4d4138');
@@ -479,7 +496,6 @@
           ctx.fillRect(wx, 0, 14, tableY);
         }
 
-        // Window on the left-center
         const winW = Math.min(240, width * 0.34);
         const winH = Math.min(280, height * 0.42);
         const winX = Math.max(24, width * 0.14);
@@ -517,7 +533,6 @@
         });
         ctx.restore();
 
-        // Wooden window frame & panes
         ctx.strokeStyle = '#efe5d8';
         ctx.lineWidth = 8;
         ctx.strokeRect(winX, winY, winW, winH);
@@ -534,7 +549,6 @@
         drawRoundedRect(winX - 10, winY + winH, winW + 20, 12, 3);
         ctx.fill();
 
-        // Curtains
         const curtainGradL = ctx.createLinearGradient(winX - 24, winY, winX + 26, winY);
         curtainGradL.addColorStop(0, '#7a4b47');
         curtainGradL.addColorStop(0.5, '#99625d');
@@ -568,7 +582,6 @@
         ctx.lineTo(winX + winW + 32, winY - 14);
         ctx.stroke();
 
-        // Bookshelf & warm lamp on right side
         if (width > 560) {
           const shelfW = 150;
           const shelfH = Math.min(260, height * 0.4);
@@ -619,7 +632,6 @@
           ctx.fill();
         }
 
-        // Sunlight beam
         const beamGrad = ctx.createLinearGradient(winX, winY, width * 0.65, height);
         beamGrad.addColorStop(0, 'rgba(255, 248, 232, 0.14)');
         beamGrad.addColorStop(1, 'rgba(255, 248, 232, 0)');
@@ -632,7 +644,6 @@
         ctx.closePath();
         ctx.fill();
 
-        // Foreground wooden table
         const tableGrad = ctx.createLinearGradient(0, tableY, 0, height);
         tableGrad.addColorStop(0, '#6b4935');
         tableGrad.addColorStop(0.15, '#593b2a');
@@ -1057,29 +1068,42 @@
         });
       }
 
+      // Exact hitboxes updated every frame from drawn positions
       let envelopeHitbox = { x: 0, y: 0, w: 0, h: 0, active: false };
       let extraGiftHitbox = { x: 0, y: 0, w: 0, h: 0, active: false };
+      let catPawHitbox = { x: 0, y: 0, w: 0, h: 0, active: false };
 
-      function isInsideBox(clientX, clientY, box, pad = 12) {
+      function isInsideBox(px, py, box, pad = 6) {
         if (!box.active) return false;
         return (
-          clientX >= box.x - pad &&
-          clientX <= box.x + box.w + pad &&
-          clientY >= box.y - pad &&
-          clientY <= box.y + box.h + pad
+          px >= box.x - pad &&
+          px <= box.x + box.w + pad &&
+          py >= box.y - pad &&
+          py <= box.y + box.h + pad
         );
       }
 
-      canvas.addEventListener('pointermove', () => {
-        canvas.style.cursor = state === 'GARDEN' ? 'pointer' : 'default';
+      canvas.addEventListener('pointermove', (e) => {
+        if (state !== 'GARDEN') {
+          canvas.style.cursor = 'default';
+          return;
+        }
+        const { x, y } = getPointerPos(e);
+        const overInteractive =
+          isInsideBox(x, y, envelopeHitbox, 6) ||
+          isInsideBox(x, y, extraGiftHitbox, 6) ||
+          isInsideBox(x, y, catPawHitbox, 6);
+        canvas.style.cursor = overInteractive ? 'pointer' : 'crosshair';
       });
 
       canvas.addEventListener('pointerdown', (e) => {
         if (state !== 'GARDEN') return;
         if (backdrop.classList.contains('open')) return;
 
+        const { x, y } = getPointerPos(e);
+
         // 0. Check if user tapped the curious black cat paw
-        if (isInsideBox(e.clientX, e.clientY, catPawHitbox, 10)) {
+        if (isInsideBox(x, y, catPawHitbox, 6)) {
           if (catPaw.active && !catPaw.startled) {
             catPaw.startled = true;
             catPaw.startleTime = performance.now();
@@ -1088,17 +1112,17 @@
         }
 
         // 1. Check envelope click
-        if (isInsideBox(e.clientX, e.clientY, envelopeHitbox, 12)) {
+        if (isInsideBox(x, y, envelopeHitbox, 8)) {
           backdrop.classList.add('open');
           return;
         }
 
         // 2. Check extra gift box or mate click
-        if (isInsideBox(e.clientX, e.clientY, extraGiftHitbox, 12)) {
+        if (isInsideBox(x, y, extraGiftHitbox, 8)) {
           if (extraGiftState === 'BOX') {
             extraGiftState = 'MATE';
             extraGiftTime = performance.now();
-            spawnCelebration(extraGiftHitbox.x + extraGiftHitbox.w / 2, extraGiftHitbox.y + 10, 42);
+            spawnCelebration(extraGiftHitbox.x + extraGiftHitbox.w / 2, extraGiftHitbox.y + extraGiftHitbox.h / 2, 42);
             document.getElementById('garden-hint').textContent = 'Tap the mate to sip • Tap anywhere for flowers • Tap envelope to read';
           } else {
             lastMateSipTime = performance.now();
@@ -1322,10 +1346,10 @@
       }
 
       // Draw Prepared Argentine Mate with Bombilla
-      function drawPreparedMate(mx, my, now, elapsed) {
+      function drawPreparedMate(mx, my, scale, now, elapsed) {
         const age = (now - extraGiftTime) / 1000;
         const popScale = Math.min(1, age / 0.45);
-        const easePop = 1 - Math.pow(1 - popScale, 3);
+        const easePop = (1 - Math.pow(1 - popScale, 3)) * scale;
 
         const sipAge = (now - lastMateSipTime) / 1000;
         const sipActive = sipAge >= 0 && sipAge < 1.25;
@@ -1413,11 +1437,12 @@
 
         ctx.restore();
 
+        // Exact hitbox matching mate gourd + bombilla
         extraGiftHitbox = {
-          x: mx - 30,
-          y: my - 56,
-          w: 60,
-          h: 84,
+          x: mx - 30 * scale,
+          y: my - 56 * scale,
+          w: 60 * scale,
+          h: 84 * scale,
           active: true
         };
       }
@@ -1425,7 +1450,7 @@
       // ---------------------------------------------------------
       // CURIOUS BLACK CAT PAW REACHING ONTO THE TABLE
       // ---------------------------------------------------------
-      function updateAndDrawCatPaw(now, baseX, tableSurfaceY) {
+      function updateAndDrawCatPaw(now, baseX, tableSurfaceY, sideOffset) {
         if (!catPaw.active) {
           catPawHitbox.active = false;
           if (now >= catPaw.nextSpawn && !backdrop.classList.contains('open')) {
@@ -1439,8 +1464,6 @@
           return;
         }
 
-        // Determine target X & Y on the table
-        const sideOffset = Math.min(125, width * 0.25);
         let targetX = baseX;
         let targetY = tableSurfaceY - 22;
 
@@ -1473,17 +1496,14 @@
           const d = catPaw.duration;
 
           if (elapsed < 1.2) {
-            // Sneaking up slowly
             const t = elapsed / 1.2;
             const ease = 1 - Math.pow(1 - t, 3);
             curY = startY + (targetY - startY) * ease;
           } else if (elapsed < d - 1.0) {
-            // Hovering & gently tapping the item twice
             const tapTime = elapsed - 1.2;
             pokeOffset = -Math.abs(Math.sin(tapTime * Math.PI * 1.4)) * 14;
             curY = targetY + pokeOffset;
           } else if (elapsed < d) {
-            // Retreating back down under the table
             const t = (elapsed - (d - 1.0)) / 1.0;
             const ease = t * t;
             curY = targetY + (startY - targetY) * ease;
@@ -1494,18 +1514,15 @@
           }
         }
 
-        // Draw Black Cat Arm & Paw
         ctx.save();
         ctx.translate(targetX, curY);
         ctx.rotate(catPaw.tilt);
 
-        // Soft shadow on table under paw
         ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
         ctx.beginPath();
         ctx.ellipse(6, 15, 22, 12, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // Furry black foreleg extending down off-screen
         const armGrad = ctx.createLinearGradient(-18, 0, 18, 0);
         armGrad.addColorStop(0, '#0c0c0e');
         armGrad.addColorStop(0.45, '#1e1e24');
@@ -1520,7 +1537,6 @@
         ctx.closePath();
         ctx.fill();
 
-        // Subtle fur tuft highlights along edges
         ctx.strokeStyle = '#2b2b33';
         ctx.lineWidth = 1.5;
         ctx.beginPath();
@@ -1532,7 +1548,6 @@
         ctx.lineTo(-21, 75);
         ctx.stroke();
 
-        // Rounded cat paw (4 toes)
         ctx.fillStyle = '#16161b';
         const toes = [
           { x: -13, y: -4, rx: 6.5, ry: 8.5, rot: -0.25 },
@@ -1549,7 +1564,6 @@
           ctx.ellipse(0, 0, t.rx, t.ry, 0, 0, Math.PI * 2);
           ctx.fill();
 
-          // Cute subtle pink toe bean peeking at the tip
           ctx.fillStyle = '#d98a9c';
           ctx.beginPath();
           ctx.ellipse(0, -3.5, 3.2, 4, 0, 0, Math.PI * 2);
@@ -1558,13 +1572,11 @@
           ctx.restore();
         });
 
-        // Main paw palm base
         ctx.fillStyle = '#16161b';
         ctx.beginPath();
         ctx.ellipse(0, 4, 17, 13, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // Central pink paw pad peeking slightly
         ctx.fillStyle = '#c97689';
         ctx.beginPath();
         ctx.ellipse(0, 3, 7.5, 5.5, 0, 0, Math.PI * 2);
@@ -1582,10 +1594,10 @@
       }
 
       // Draw Pot + Extra Gift (Box or Mate) + Envelope on Table
-      function drawTableItems(baseX, rimY, now, elapsed) {
-        const potTopW = 116;
-        const potBotW = 82;
-        const potH = 95;
+      function drawTableItems(baseX, rimY, sceneScale, sideOffset, now, elapsed) {
+        const potTopW = 116 * sceneScale;
+        const potBotW = 82 * sceneScale;
+        const potH = 95 * sceneScale;
         const tableSurfaceY = rimY + potH;
 
         ctx.save();
@@ -1593,7 +1605,7 @@
         // 1. Pot shadow & body
         ctx.fillStyle = 'rgba(20, 10, 5, 0.48)';
         ctx.beginPath();
-        ctx.ellipse(baseX, tableSurfaceY + 4, 64, 13, 0, 0, Math.PI * 2);
+        ctx.ellipse(baseX, tableSurfaceY + 4, 64 * sceneScale, 13 * sceneScale, 0, 0, Math.PI * 2);
         ctx.fill();
 
         const bodyGrad = ctx.createLinearGradient(baseX - potTopW / 2, rimY, baseX + potTopW / 2, tableSurfaceY);
@@ -1603,51 +1615,54 @@
 
         ctx.fillStyle = bodyGrad;
         ctx.beginPath();
-        ctx.moveTo(baseX - potTopW / 2 + 6, rimY + 16);
-        ctx.lineTo(baseX + potTopW / 2 - 6, rimY + 16);
+        ctx.moveTo(baseX - potTopW / 2 + 6 * sceneScale, rimY + 16 * sceneScale);
+        ctx.lineTo(baseX + potTopW / 2 - 6 * sceneScale, rimY + 16 * sceneScale);
         ctx.lineTo(baseX + potBotW / 2, tableSurfaceY);
         ctx.lineTo(baseX - potBotW / 2, tableSurfaceY);
         ctx.closePath();
         ctx.fill();
 
-        const rimGrad = ctx.createLinearGradient(baseX - potTopW / 2, rimY, baseX + potTopW / 2, rimY + 20);
+        const rimGrad = ctx.createLinearGradient(baseX - potTopW / 2, rimY, baseX + potTopW / 2, rimY + 20 * sceneScale);
         rimGrad.addColorStop(0, '#d88c6a');
         rimGrad.addColorStop(1, '#944d30');
         ctx.fillStyle = rimGrad;
         ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
         ctx.shadowBlur = 6;
         ctx.shadowOffsetY = 3;
-        drawRoundedRect(baseX - potTopW / 2 - 4, rimY, potTopW + 8, 20, 6);
+        drawRoundedRect(baseX - potTopW / 2 - 4 * sceneScale, rimY, potTopW + 8 * sceneScale, 20 * sceneScale, 6 * sceneScale);
         ctx.fill();
         ctx.shadowBlur = 0;
         ctx.shadowOffsetY = 0;
 
         // 2. Left side of pot: Extra Gift Box -> Prepared Mate
-        const leftX = baseX - Math.min(125, width * 0.25);
+        const leftX = baseX - sideOffset;
         if (extraGiftState === 'BOX') {
           const dropIn = Math.min(1, elapsed / 0.65);
           const easeDrop = 1 - Math.pow(1 - dropIn, 3);
-          const boxCenterY = tableSurfaceY - 28 - (1 - easeDrop) * 45;
-          const smallScale = 0.52 * easeDrop;
+          const smallScale = 0.54 * sceneScale * easeDrop;
+          // Center Y so bottom of box (cy + 65 * smallScale) sits directly on tableSurfaceY
+          const boxCenterY = tableSurfaceY - 62 * smallScale - (1 - easeDrop) * 40;
 
           drawGiftBox(leftX, boxCenterY, smallScale, elapsed, '#3a6b56', 'Extra gift', true);
 
+          const boxW = 144 * smallScale;
+          const boxH = 135 * smallScale;
           extraGiftHitbox = {
-            x: leftX - 42,
-            y: boxCenterY - 40,
-            w: 84,
-            h: 78,
+            x: leftX - boxW / 2,
+            y: boxCenterY - 70 * smallScale,
+            w: boxW,
+            h: boxH,
             active: true
           };
         } else {
-          drawPreparedMate(leftX, tableSurfaceY - 22, now, elapsed);
+          drawPreparedMate(leftX, tableSurfaceY - 22 * sceneScale, sceneScale, now, elapsed);
         }
 
-        // 3. Right side of pot: Envelope
-        const envW = 82;
-        const envH = 54;
-        const envX = baseX + Math.min(125, width * 0.25);
-        const envY = tableSurfaceY - 34;
+        // 3. Right side of pot: Envelope resting directly on tableSurfaceY
+        const envW = 84 * sceneScale;
+        const envH = 56 * sceneScale;
+        const envX = baseX + sideOffset;
+        const envY = tableSurfaceY - envH / 2 + 2;
         const pulse = 0.5 + 0.5 * Math.sin(elapsed * 3.2);
 
         ctx.save();
@@ -1662,7 +1677,7 @@
         envGrad.addColorStop(0, '#fbf6ee');
         envGrad.addColorStop(1, '#e6d7c1');
         ctx.fillStyle = envGrad;
-        drawRoundedRect(-envW / 2, -envH / 2, envW, envH, 5);
+        drawRoundedRect(-envW / 2, -envH / 2, envW, envH, 5 * sceneScale);
         ctx.fill();
 
         ctx.shadowBlur = 0;
@@ -1672,50 +1687,54 @@
         ctx.lineWidth = 1.3;
         ctx.beginPath();
         ctx.moveTo(-envW / 2 + 2, -envH / 2 + 2);
-        ctx.lineTo(0, 4);
+        ctx.lineTo(0, 4 * sceneScale);
         ctx.lineTo(envW / 2 - 2, -envH / 2 + 2);
         ctx.moveTo(-envW / 2 + 2, envH / 2 - 2);
-        ctx.lineTo(-10, -2);
+        ctx.lineTo(-10 * sceneScale, -2 * sceneScale);
         ctx.moveTo(envW / 2 - 2, envH / 2 - 2);
-        ctx.lineTo(10, -2);
+        ctx.lineTo(10 * sceneScale, -2 * sceneScale);
         ctx.stroke();
 
         // Red wax seal
         ctx.fillStyle = '#9e2a2b';
         ctx.beginPath();
-        ctx.arc(0, 3, 8.5, 0, Math.PI * 2);
+        ctx.arc(0, 3 * sceneScale, 8.5 * sceneScale, 0, Math.PI * 2);
         ctx.fill();
         ctx.strokeStyle = '#c44536';
         ctx.lineWidth = 1.2;
         ctx.beginPath();
-        ctx.arc(0, 3, 6, 0, Math.PI * 2);
+        ctx.arc(0, 3 * sceneScale, 6 * sceneScale, 0, Math.PI * 2);
         ctx.stroke();
 
         ctx.fillStyle = '#5c473e';
-        ctx.font = 'italic 10px Georgia';
-        ctx.fillText('Для Ри', -envW / 2 + 8, envH / 2 - 7);
+        ctx.font = `italic ${Math.max(9, Math.round(10 * sceneScale))}px Georgia`;
+        ctx.fillText('Для Ри', -envW / 2 + 8 * sceneScale, envH / 2 - 7 * sceneScale);
 
         ctx.restore();
 
+        // Exact hitbox centered on (envX, envY)
         envelopeHitbox = {
-          x: envX - envW / 2 - 6,
-          y: envY - envH / 2 - 6,
-          w: envW + 12,
-          h: envH + 12,
+          x: envX - envW / 2,
+          y: envY - envH / 2,
+          w: envW,
+          h: envH,
           active: true
         };
 
         ctx.restore();
 
         // 4. Curious Black Cat Paw in foreground
-        updateAndDrawCatPaw(now, baseX, tableSurfaceY);
+        updateAndDrawCatPaw(now, baseX, tableSurfaceY, sideOffset);
       }
 
       function drawGardenStage(now, elapsed) {
         drawRoomBackground(elapsed);
 
+        const sceneScale = width < 480 ? Math.max(0.76, width / 480) : 1;
+        const sideOffset = width < 480 ? width * 0.32 : Math.min(135, width * 0.25);
+
         const baseX = width / 2;
-        const rimY = height * 0.72 - 36;
+        const rimY = height * 0.72 - 36 * sceneScale;
 
         grownFlowers.forEach((f) => {
           const age = (now - f.bornAt) / 1000;
@@ -1726,20 +1745,23 @@
           const easeBloom = 1 - Math.pow(1 - bloomProg, 3);
 
           const sway = Math.sin(elapsed * 1.6 + f.swayPhase) * 5 * easeStem;
-          const targetX = baseX + f.ox + sway;
-          const targetY = rimY + f.oy;
+          const targetX = baseX + (f.ox + sway) * sceneScale;
+          const targetY = rimY + f.oy * sceneScale;
 
-          const curX = baseX + (targetX - baseX) * easeStem;
-          const curY = (rimY + 8) + (targetY - (rimY + 8)) * easeStem;
+          const startX = baseX + f.ox * 0.18 * sceneScale;
+          const startY = rimY + 8 * sceneScale;
+
+          const curX = startX + (targetX - startX) * easeStem;
+          const curY = startY + (targetY - startY) * easeStem;
 
           ctx.strokeStyle = '#2d5a3f';
-          ctx.lineWidth = 3.8 * f.scale;
+          ctx.lineWidth = 3.8 * f.scale * sceneScale;
           ctx.lineCap = 'round';
           ctx.beginPath();
-          ctx.moveTo(baseX + f.ox * 0.18, rimY + 8);
+          ctx.moveTo(startX, startY);
           ctx.quadraticCurveTo(
-            baseX + f.ox * 0.35,
-            rimY + f.oy * 0.45,
+            baseX + f.ox * 0.35 * sceneScale,
+            rimY + f.oy * 0.45 * sceneScale,
             curX,
             curY
           );
@@ -1747,18 +1769,19 @@
 
           if (easeStem > 0.45) {
             const leafProg = (easeStem - 0.45) / 0.55;
-            const midX = baseX + (curX - baseX) * 0.55;
-            const midY = (rimY + 8) + (curY - (rimY + 8)) * 0.55;
-            drawLeaf(midX, midY, f.leafSide === 1 ? -0.55 : -2.55, 40 * f.scale, leafProg);
+            const midX = startX + (curX - startX) * 0.55;
+            const midY = startY + (curY - startY) * 0.55;
+            drawLeaf(midX, midY, f.leafSide === 1 ? -0.55 : -2.55, 40 * f.scale * sceneScale, leafProg);
           }
 
-          drawFlowerHead(curX, curY, f.scale, f.hue, f.type, easeBloom, elapsed);
+          drawFlowerHead(curX, curY, f.scale * sceneScale, f.hue, f.type, easeBloom, elapsed);
         });
 
-        drawTableItems(baseX, rimY, now, elapsed);
+        drawTableItems(baseX, rimY, sceneScale, sideOffset, now, elapsed);
       }
 
       function loop(now) {
+        syncCanvasSize();
         const elapsed = (now - stateStartTime) / 1000;
         ctx.clearRect(0, 0, width, height);
 
