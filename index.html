@@ -325,20 +325,43 @@
       }
 
       // ---------------------------------------------------------
-      // CANVAS & 1:1 COORDINATE MAPPING (CSS PIXELS)
+      // CANVAS & OFFSCREEN ROOM CACHE FOR 60 FPS PERFORMANCE
       // ---------------------------------------------------------
       const canvas = document.getElementById('scene');
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext('2d', { alpha: false });
+      const roomCache = document.createElement('canvas');
+      const rCtx = roomCache.getContext('2d', { alpha: false });
+
       let width = 0;
       let height = 0;
+      let roomDirty = true;
+
+      function drawRoundedRectOn(targetCtx, x, y, w, h, r) {
+        targetCtx.beginPath();
+        targetCtx.moveTo(x + r, y);
+        targetCtx.lineTo(x + w - r, y);
+        targetCtx.quadraticCurveTo(x + w, y, x + w, y + r);
+        targetCtx.lineTo(x + w, y + h - r);
+        targetCtx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        targetCtx.lineTo(x + r, y + h);
+        targetCtx.quadraticCurveTo(x, y + h, x, y + h - r);
+        targetCtx.lineTo(x, y + r);
+        targetCtx.quadraticCurveTo(x, y, x + r, y);
+        targetCtx.closePath();
+      }
+
+      function drawRoundedRect(x, y, w, h, r) {
+        drawRoundedRectOn(ctx, x, y, w, h, r);
+      }
 
       function syncCanvasSize() {
         const rect = canvas.getBoundingClientRect();
         const newW = Math.round(rect.width) || window.innerWidth;
         const newH = Math.round(rect.height) || window.innerHeight;
         if (width !== newW || height !== newH) {
-          width = canvas.width = newW;
-          height = canvas.height = newH;
+          width = canvas.width = roomCache.width = newW;
+          height = canvas.height = roomCache.height = newH;
+          roomDirty = true;
         }
       }
 
@@ -382,7 +405,7 @@
       const gardenUI = document.getElementById('garden-ui');
 
       // Snowflakes outside window
-      const snowflakes = Array.from({ length: 28 }, () => ({
+      const snowflakes = Array.from({ length: 24 }, () => ({
         x: Math.random(),
         y: Math.random(),
         r: Math.random() * 2 + 1,
@@ -391,15 +414,15 @@
       }));
 
       // Steam particles rising from hot mate
-      const steamParticles = Array.from({ length: 12 }, (_, i) => ({
-        offset: (i / 12) * Math.PI * 2,
+      const steamParticles = Array.from({ length: 10 }, (_, i) => ({
+        offset: (i / 10) * Math.PI * 2,
         speed: 0.4 + Math.random() * 0.3
       }));
 
       // Streamers & confetti particles
       const streamers = [];
 
-      function spawnCelebration(cx, cy, count = 65) {
+      function spawnCelebration(cx, cy, count = 55) {
         const colors = ['#f4d35e', '#ee964b', '#f28482', '#f6bd60', '#84a59d', '#f5cac3', '#e07a5f'];
         for (let i = 0; i < count; i++) {
           const angle = -Math.PI / 2 + (Math.random() - 0.5) * 2.2;
@@ -449,7 +472,7 @@
             ctx.lineWidth = 3;
             ctx.lineCap = 'round';
             ctx.beginPath();
-            for (let t = 0; t <= s.length; t += 3) {
+            for (let t = 0; t <= s.length; t += 4) {
               const wx = Math.sin(t * 0.35 + now * 0.01) * 4;
               if (t === 0) ctx.moveTo(wx, 0);
               else ctx.lineTo(wx, t);
@@ -464,36 +487,22 @@
         }
       }
 
-      function drawRoundedRect(x, y, w, h, r) {
-        ctx.beginPath();
-        ctx.moveTo(x + r, y);
-        ctx.lineTo(x + w - r, y);
-        ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-        ctx.lineTo(x + w, y + h - r);
-        ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-        ctx.lineTo(x + r, y + h);
-        ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-        ctx.lineTo(x, y + r);
-        ctx.quadraticCurveTo(x, y, x + r, y);
-        ctx.closePath();
-      }
-
       // ---------------------------------------------------------
-      // COZY HOME ROOM BACKGROUND
+      // CACHED STATIC ROOM + ANIMATED SNOWFLAKES
       // ---------------------------------------------------------
-      function drawRoomBackground(elapsed) {
+      function rebuildRoomCache() {
         const tableY = height * 0.72;
 
-        const wallGrad = ctx.createLinearGradient(0, 0, 0, tableY);
+        const wallGrad = rCtx.createLinearGradient(0, 0, 0, tableY);
         wallGrad.addColorStop(0, '#3b332d');
         wallGrad.addColorStop(0.6, '#4d4138');
         wallGrad.addColorStop(1, '#332a24');
-        ctx.fillStyle = wallGrad;
-        ctx.fillRect(0, 0, width, tableY);
+        rCtx.fillStyle = wallGrad;
+        rCtx.fillRect(0, 0, width, tableY);
 
-        ctx.fillStyle = 'rgba(255, 245, 230, 0.02)';
+        rCtx.fillStyle = 'rgba(255, 245, 230, 0.02)';
         for (let wx = 0; wx < width; wx += 36) {
-          ctx.fillRect(wx, 0, 14, tableY);
+          rCtx.fillRect(wx, 0, 14, tableY);
         }
 
         const winW = Math.min(240, width * 0.34);
@@ -501,38 +510,153 @@
         const winX = Math.max(24, width * 0.14);
         const winY = height * 0.14;
 
-        const skyGrad = ctx.createLinearGradient(winX, winY, winX, winY + winH);
+        const skyGrad = rCtx.createLinearGradient(winX, winY, winX, winY + winH);
         skyGrad.addColorStop(0, '#7294b5');
         skyGrad.addColorStop(0.65, '#adc5db');
         skyGrad.addColorStop(1, '#e6eef5');
-        ctx.fillStyle = skyGrad;
-        ctx.fillRect(winX, winY, winW, winH);
+        rCtx.fillStyle = skyGrad;
+        rCtx.fillRect(winX, winY, winW, winH);
 
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(winX, winY, winW, winH);
-        ctx.clip();
+        rCtx.fillStyle = '#d8e4ef';
+        rCtx.beginPath();
+        rCtx.moveTo(winX, winY + winH);
+        rCtx.lineTo(winX, winY + winH * 0.72);
+        rCtx.quadraticCurveTo(winX + winW * 0.4, winY + winH * 0.62, winX + winW, winY + winH * 0.75);
+        rCtx.lineTo(winX + winW, winY + winH);
+        rCtx.fill();
 
-        ctx.fillStyle = '#d8e4ef';
-        ctx.beginPath();
-        ctx.moveTo(winX, winY + winH);
-        ctx.lineTo(winX, winY + winH * 0.72);
-        ctx.quadraticCurveTo(winX + winW * 0.4, winY + winH * 0.62, winX + winW, winY + winH * 0.75);
-        ctx.lineTo(winX + winW, winY + winH);
-        ctx.fill();
+        // Curtains
+        const curtainGradL = rCtx.createLinearGradient(winX - 24, winY, winX + 26, winY);
+        curtainGradL.addColorStop(0, '#7a4b47');
+        curtainGradL.addColorStop(0.5, '#99625d');
+        curtainGradL.addColorStop(1, '#663c39');
+        rCtx.fillStyle = curtainGradL;
+        rCtx.beginPath();
+        rCtx.moveTo(winX - 22, winY - 12);
+        rCtx.lineTo(winX + 24, winY - 12);
+        rCtx.quadraticCurveTo(winX + 12, winY + winH * 0.5, winX + 30, winY + winH + 22);
+        rCtx.lineTo(winX - 26, winY + winH + 22);
+        rCtx.closePath();
+        rCtx.fill();
+
+        const curtainGradR = rCtx.createLinearGradient(winX + winW - 26, winY, winX + winW + 24, winY);
+        curtainGradR.addColorStop(0, '#663c39');
+        curtainGradR.addColorStop(0.5, '#99625d');
+        curtainGradR.addColorStop(1, '#7a4b47');
+        rCtx.fillStyle = curtainGradR;
+        rCtx.beginPath();
+        rCtx.moveTo(winX + winW - 24, winY - 12);
+        rCtx.lineTo(winX + winW + 22, winY - 12);
+        rCtx.lineTo(winX + winW + 26, winY + winH + 22);
+        rCtx.quadraticCurveTo(winX + winW - 12, winY + winH * 0.5, winX + winW - 30, winY + winH + 22);
+        rCtx.closePath();
+        rCtx.fill();
+
+        rCtx.strokeStyle = '#c49a6c';
+        rCtx.lineWidth = 4;
+        rCtx.beginPath();
+        rCtx.moveTo(winX - 32, winY - 14);
+        rCtx.lineTo(winX + winW + 32, winY - 14);
+        rCtx.stroke();
+
+        // Bookshelf & warm lamp on right side
+        if (width > 560) {
+          const shelfW = 150;
+          const shelfH = Math.min(260, height * 0.4);
+          const shelfX = width - shelfW - Math.max(30, width * 0.1);
+          const shelfY = tableY - shelfH;
+
+          rCtx.fillStyle = '#2b2019';
+          rCtx.fillRect(shelfX, shelfY, shelfW, shelfH);
+          rCtx.strokeStyle = '#3d2e24';
+          rCtx.lineWidth = 5;
+          rCtx.strokeRect(shelfX, shelfY, shelfW, shelfH);
+
+          const midShelfY = shelfY + shelfH * 0.52;
+          rCtx.fillStyle = '#3d2e24';
+          rCtx.fillRect(shelfX, midShelfY, shelfW, 6);
+
+          const bookColors = ['#8c4a47', '#4a6b5d', '#b88b58', '#52647a', '#7d5a50'];
+          let bx = shelfX + 12;
+          bookColors.forEach((col, i) => {
+            const bw = 14 + (i % 2) * 4;
+            const bh = 52 + (i % 3) * 8;
+            rCtx.fillStyle = col;
+            rCtx.fillRect(bx, midShelfY - bh, bw, bh);
+            bx += bw + 3;
+          });
+
+          const lampX = shelfX + shelfW * 0.5;
+          const lampY = shelfY;
+          const lampGlow = rCtx.createRadialGradient(lampX, lampY - 28, 4, lampX, lampY - 28, 110);
+          lampGlow.addColorStop(0, 'rgba(255, 214, 153, 0.38)');
+          lampGlow.addColorStop(1, 'rgba(255, 214, 153, 0)');
+          rCtx.fillStyle = lampGlow;
+          rCtx.beginPath();
+          rCtx.arc(lampX, lampY - 28, 110, 0, Math.PI * 2);
+          rCtx.fill();
+
+          rCtx.fillStyle = '#b58967';
+          rCtx.fillRect(lampX - 10, lampY - 6, 20, 6);
+          rCtx.fillRect(lampX - 3, lampY - 22, 6, 16);
+
+          rCtx.fillStyle = '#f5deb3';
+          rCtx.beginPath();
+          rCtx.moveTo(lampX - 16, lampY - 44);
+          rCtx.lineTo(lampX + 16, lampY - 44);
+          rCtx.lineTo(lampX + 24, lampY - 20);
+          rCtx.lineTo(lampX - 24, lampY - 20);
+          rCtx.closePath();
+          rCtx.fill();
+        }
+
+        // Foreground wooden table
+        const tableGrad = rCtx.createLinearGradient(0, tableY, 0, height);
+        tableGrad.addColorStop(0, '#6b4935');
+        tableGrad.addColorStop(0.15, '#593b2a');
+        tableGrad.addColorStop(1, '#2e1d14');
+        rCtx.fillStyle = tableGrad;
+        rCtx.fillRect(0, tableY, width, height - tableY);
+
+        rCtx.fillStyle = '#875f47';
+        rCtx.fillRect(0, tableY, width, 4);
+
+        rCtx.strokeStyle = 'rgba(35, 20, 12, 0.25)';
+        rCtx.lineWidth = 1.5;
+        for (let ty = tableY + 22; ty < height; ty += 26) {
+          rCtx.beginPath();
+          rCtx.moveTo(0, ty);
+          rCtx.quadraticCurveTo(width * 0.5, ty + 4, width, ty - 2);
+          rCtx.stroke();
+        }
+
+        roomDirty = false;
+      }
+
+      function drawRoomBackground(elapsed) {
+        if (roomDirty) rebuildRoomCache();
+
+        // Fast blit of cached room
+        ctx.drawImage(roomCache, 0, 0);
+
+        // Animated snowflakes inside window panes
+        const winW = Math.min(240, width * 0.34);
+        const winH = Math.min(280, height * 0.42);
+        const winX = Math.max(24, width * 0.14);
+        const winY = height * 0.14;
 
         ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
         snowflakes.forEach(s => {
           s.y += s.speedY;
           if (s.y > 1) s.y = 0;
-          const sx = winX + ((s.x + Math.sin(elapsed + s.sway) * 0.03 + 1) % 1) * winW;
-          const sy = winY + s.y * winH;
+          const sx = winX + 6 + ((s.x + Math.sin(elapsed + s.sway) * 0.03 + 1) % 1) * (winW - 12);
+          const sy = winY + 6 + s.y * (winH - 12);
           ctx.beginPath();
           ctx.arc(sx, sy, s.r, 0, Math.PI * 2);
           ctx.fill();
         });
-        ctx.restore();
 
+        // Window frame drawn over snow
         ctx.strokeStyle = '#efe5d8';
         ctx.lineWidth = 8;
         ctx.strokeRect(winX, winY, winW, winH);
@@ -548,120 +672,6 @@
         ctx.fillStyle = '#e3d5c3';
         drawRoundedRect(winX - 10, winY + winH, winW + 20, 12, 3);
         ctx.fill();
-
-        const curtainGradL = ctx.createLinearGradient(winX - 24, winY, winX + 26, winY);
-        curtainGradL.addColorStop(0, '#7a4b47');
-        curtainGradL.addColorStop(0.5, '#99625d');
-        curtainGradL.addColorStop(1, '#663c39');
-        ctx.fillStyle = curtainGradL;
-        ctx.beginPath();
-        ctx.moveTo(winX - 22, winY - 12);
-        ctx.lineTo(winX + 24, winY - 12);
-        ctx.quadraticCurveTo(winX + 12, winY + winH * 0.5, winX + 30, winY + winH + 22);
-        ctx.lineTo(winX - 26, winY + winH + 22);
-        ctx.closePath();
-        ctx.fill();
-
-        const curtainGradR = ctx.createLinearGradient(winX + winW - 26, winY, winX + winW + 24, winY);
-        curtainGradR.addColorStop(0, '#663c39');
-        curtainGradR.addColorStop(0.5, '#99625d');
-        curtainGradR.addColorStop(1, '#7a4b47');
-        ctx.fillStyle = curtainGradR;
-        ctx.beginPath();
-        ctx.moveTo(winX + winW - 24, winY - 12);
-        ctx.lineTo(winX + winW + 22, winY - 12);
-        ctx.lineTo(winX + winW + 26, winY + winH + 22);
-        ctx.quadraticCurveTo(winX + winW - 12, winY + winH * 0.5, winX + winW - 30, winY + winH + 22);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.strokeStyle = '#c49a6c';
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.moveTo(winX - 32, winY - 14);
-        ctx.lineTo(winX + winW + 32, winY - 14);
-        ctx.stroke();
-
-        if (width > 560) {
-          const shelfW = 150;
-          const shelfH = Math.min(260, height * 0.4);
-          const shelfX = width - shelfW - Math.max(30, width * 0.1);
-          const shelfY = tableY - shelfH;
-
-          ctx.fillStyle = '#2b2019';
-          ctx.fillRect(shelfX, shelfY, shelfW, shelfH);
-          ctx.strokeStyle = '#3d2e24';
-          ctx.lineWidth = 5;
-          ctx.strokeRect(shelfX, shelfY, shelfW, shelfH);
-
-          const midShelfY = shelfY + shelfH * 0.52;
-          ctx.fillStyle = '#3d2e24';
-          ctx.fillRect(shelfX, midShelfY, shelfW, 6);
-
-          const bookColors = ['#8c4a47', '#4a6b5d', '#b88b58', '#52647a', '#7d5a50'];
-          let bx = shelfX + 12;
-          bookColors.forEach((col, i) => {
-            const bw = 14 + (i % 2) * 4;
-            const bh = 52 + (i % 3) * 8;
-            ctx.fillStyle = col;
-            ctx.fillRect(bx, midShelfY - bh, bw, bh);
-            bx += bw + 3;
-          });
-
-          const lampX = shelfX + shelfW * 0.5;
-          const lampY = shelfY;
-          const lampGlow = ctx.createRadialGradient(lampX, lampY - 28, 4, lampX, lampY - 28, 110);
-          lampGlow.addColorStop(0, 'rgba(255, 214, 153, 0.38)');
-          lampGlow.addColorStop(1, 'rgba(255, 214, 153, 0)');
-          ctx.fillStyle = lampGlow;
-          ctx.beginPath();
-          ctx.arc(lampX, lampY - 28, 110, 0, Math.PI * 2);
-          ctx.fill();
-
-          ctx.fillStyle = '#b58967';
-          ctx.fillRect(lampX - 10, lampY - 6, 20, 6);
-          ctx.fillRect(lampX - 3, lampY - 22, 6, 16);
-
-          ctx.fillStyle = '#f5deb3';
-          ctx.beginPath();
-          ctx.moveTo(lampX - 16, lampY - 44);
-          ctx.lineTo(lampX + 16, lampY - 44);
-          ctx.lineTo(lampX + 24, lampY - 20);
-          ctx.lineTo(lampX - 24, lampY - 20);
-          ctx.closePath();
-          ctx.fill();
-        }
-
-        const beamGrad = ctx.createLinearGradient(winX, winY, width * 0.65, height);
-        beamGrad.addColorStop(0, 'rgba(255, 248, 232, 0.14)');
-        beamGrad.addColorStop(1, 'rgba(255, 248, 232, 0)');
-        ctx.fillStyle = beamGrad;
-        ctx.beginPath();
-        ctx.moveTo(winX, winY);
-        ctx.lineTo(winX + winW, winY);
-        ctx.lineTo(width * 0.85, height);
-        ctx.lineTo(width * 0.1, height);
-        ctx.closePath();
-        ctx.fill();
-
-        const tableGrad = ctx.createLinearGradient(0, tableY, 0, height);
-        tableGrad.addColorStop(0, '#6b4935');
-        tableGrad.addColorStop(0.15, '#593b2a');
-        tableGrad.addColorStop(1, '#2e1d14');
-        ctx.fillStyle = tableGrad;
-        ctx.fillRect(0, tableY, width, height - tableY);
-
-        ctx.fillStyle = '#875f47';
-        ctx.fillRect(0, tableY, width, 4);
-
-        ctx.strokeStyle = 'rgba(35, 20, 12, 0.25)';
-        ctx.lineWidth = 1.5;
-        for (let ty = tableY + 22; ty < height; ty += 26) {
-          ctx.beginPath();
-          ctx.moveTo(0, ty);
-          ctx.quadraticCurveTo(width * 0.5, ty + 4, width, ty - 2);
-          ctx.stroke();
-        }
       }
 
       // ---------------------------------------------------------
@@ -756,8 +766,6 @@
         ctx.fill();
 
         ctx.fillStyle = '#fbf6ee';
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
-        ctx.shadowBlur = 4;
         ctx.beginPath();
         ctx.moveTo(14, 0);
         ctx.lineTo(4, 2.5);
@@ -924,8 +932,10 @@
 
         if (showGlow) {
           const pulse = 0.5 + 0.5 * Math.sin(elapsed * 3.4);
-          ctx.shadowColor = `rgba(255, 228, 185, ${0.35 + pulse * 0.45})`;
-          ctx.shadowBlur = 12 + pulse * 8;
+          ctx.fillStyle = `rgba(255, 228, 185, ${0.12 + pulse * 0.14})`;
+          ctx.beginPath();
+          ctx.arc(0, 0, 92, 0, Math.PI * 2);
+          ctx.fill();
         }
 
         ctx.fillStyle = 'rgba(0, 0, 0, 0.42)';
@@ -940,19 +950,12 @@
         drawRoundedRect(-65, -45, 130, 110, 8);
         ctx.fill();
 
-        ctx.shadowBlur = 0;
-
         const lidGrad = ctx.createLinearGradient(-72, -62, 72, -38);
         lidGrad.addColorStop(0, '#ebd0b3');
         lidGrad.addColorStop(1, '#c7976b');
         ctx.fillStyle = lidGrad;
-        ctx.shadowColor = 'rgba(0,0,0,0.35)';
-        ctx.shadowBlur = 8;
-        ctx.shadowOffsetY = 3;
         drawRoundedRect(-72, -62, 144, 26, 6);
         ctx.fill();
-        ctx.shadowBlur = 0;
-        ctx.shadowOffsetY = 0;
 
         ctx.fillStyle = ribbonColor;
         ctx.fillRect(-11, -62, 22, 127);
@@ -1006,7 +1009,7 @@
       openBtn.addEventListener('click', () => {
         if (state !== 'PACKAGE') return;
 
-        spawnCelebration(width / 2, height * 0.65, 65);
+        spawnCelebration(width / 2, height * 0.65, 55);
 
         state = 'GARDEN';
         stateStartTime = performance.now();
@@ -1122,7 +1125,7 @@
           if (extraGiftState === 'BOX') {
             extraGiftState = 'MATE';
             extraGiftTime = performance.now();
-            spawnCelebration(extraGiftHitbox.x + extraGiftHitbox.w / 2, extraGiftHitbox.y + extraGiftHitbox.h / 2, 42);
+            spawnCelebration(extraGiftHitbox.x + extraGiftHitbox.w / 2, extraGiftHitbox.y + extraGiftHitbox.h / 2, 38);
             document.getElementById('garden-hint').textContent = 'Tap the mate to sip • Tap anywhere for flowers • Tap envelope to read';
           } else {
             lastMateSipTime = performance.now();
@@ -1163,33 +1166,41 @@
         ctx.restore();
       }
 
+      // Fast, shadowBlur-free Layered Rose / Peony
       function drawRoseHead(hue, bloomProgress, time) {
+        // Single soft ambient drop shadow behind the flower head
+        ctx.fillStyle = 'rgba(15, 10, 8, 0.28)';
+        ctx.beginPath();
+        ctx.arc(0, 4, 46 * bloomProgress, 0, Math.PI * 2);
+        ctx.fill();
+
         const layers = 4;
         for (let l = layers; l >= 1; l--) {
           const petalsCount = l * 5;
           const radius = l * 13 * bloomProgress;
-          const lightness = 30 + (layers - l) * 12;
+          const lightness = 32 + (layers - l) * 12;
+
+          // Pre-compute gradient once per layer instead of per petal
+          const grad = ctx.createRadialGradient(0, 0, 2, 0, -radius * 0.5, radius * 1.4);
+          grad.addColorStop(0, `hsl(${hue}, 68%, ${lightness - 16}%)`);
+          grad.addColorStop(0.7, `hsl(${hue}, 76%, ${lightness}%)`);
+          grad.addColorStop(1, `hsl(${hue + 8}, 82%, ${lightness + 15}%)`);
+
+          ctx.fillStyle = grad;
+          ctx.strokeStyle = `hsla(${hue - 5}, 65%, ${Math.max(12, lightness - 24)}%, 0.45)`;
+          ctx.lineWidth = 0.8;
 
           for (let i = 0; i < petalsCount; i++) {
             const angle = (i / petalsCount) * Math.PI * 2 + l * 0.4 + Math.sin(time + l) * 0.02;
             ctx.save();
             ctx.rotate(angle);
 
-            const grad = ctx.createRadialGradient(0, 0, 2, 0, -radius * 0.5, radius * 1.4);
-            grad.addColorStop(0, `hsl(${hue}, 65%, ${lightness - 15}%)`);
-            grad.addColorStop(0.7, `hsl(${hue}, 75%, ${lightness}%)`);
-            grad.addColorStop(1, `hsl(${hue + 8}, 80%, ${lightness + 15}%)`);
-
-            ctx.fillStyle = grad;
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
-            ctx.shadowBlur = 5;
-            ctx.shadowOffsetY = 2;
-
             ctx.beginPath();
             ctx.moveTo(0, 0);
             ctx.bezierCurveTo(-radius * 0.6, -radius * 0.6, -radius * 0.5, -radius * 1.3, 0, -radius * 1.35);
             ctx.bezierCurveTo(radius * 0.5, -radius * 1.3, radius * 0.6, -radius * 0.6, 0, 0);
             ctx.fill();
+            ctx.stroke();
             ctx.restore();
           }
         }
@@ -1206,7 +1217,7 @@
         const h = 44 * bloomProgress;
         const w = 26 * bloomProgress;
 
-        ctx.fillStyle = `hsl(${hue}, 72%, 38%)`;
+        ctx.fillStyle = `hsl(${hue}, 72%, 36%)`;
         ctx.beginPath();
         ctx.moveTo(0, 4);
         ctx.bezierCurveTo(-w * 0.8, -h * 0.3, -w * 0.5, -h * 1.15, 0, -h * 1.12);
@@ -1218,8 +1229,6 @@
           grad.addColorStop(0, `hsl(${hue}, 78%, 45%)`);
           grad.addColorStop(1, `hsl(${hue + 10}, 85%, 66%)`);
           ctx.fillStyle = grad;
-          ctx.shadowColor = 'rgba(0,0,0,0.3)';
-          ctx.shadowBlur = 4;
 
           ctx.beginPath();
           ctx.moveTo(0, 5);
@@ -1232,35 +1241,39 @@
         frontGrad.addColorStop(0, `hsl(${hue}, 75%, 48%)`);
         frontGrad.addColorStop(1, `hsl(${hue + 12}, 88%, 70%)`);
         ctx.fillStyle = frontGrad;
+        ctx.strokeStyle = `hsla(${hue - 5}, 65%, 28%, 0.4)`;
+        ctx.lineWidth = 0.8;
         ctx.beginPath();
         ctx.moveTo(0, 5);
         ctx.bezierCurveTo(-w * 0.65, -h * 0.25, -w * 0.45, -h * 0.95, 0, -h);
         ctx.bezierCurveTo(w * 0.45, -h * 0.95, w * 0.65, -h * 0.25, 0, 5);
         ctx.fill();
+        ctx.stroke();
       }
 
       function drawDaisyHead(hue, bloomProgress, time) {
         const petals = 14;
         const len = 36 * bloomProgress;
+        const grad = ctx.createLinearGradient(0, 0, 0, -len);
+        grad.addColorStop(0, `hsl(${hue}, 65%, 55%)`);
+        grad.addColorStop(0.6, `hsl(${hue}, 35%, 88%)`);
+        grad.addColorStop(1, '#fffdf9');
+
+        ctx.fillStyle = grad;
+        ctx.strokeStyle = 'rgba(80, 60, 50, 0.25)';
+        ctx.lineWidth = 0.7;
+
         for (let i = 0; i < petals; i++) {
           const angle = (i / petals) * Math.PI * 2 + Math.sin(time * 1.2) * 0.03;
           ctx.save();
           ctx.rotate(angle);
-
-          const grad = ctx.createLinearGradient(0, 0, 0, -len);
-          grad.addColorStop(0, `hsl(${hue}, 65%, 55%)`);
-          grad.addColorStop(0.6, `hsl(${hue}, 35%, 88%)`);
-          grad.addColorStop(1, '#fffdf9');
-
-          ctx.fillStyle = grad;
-          ctx.shadowColor = 'rgba(0,0,0,0.25)';
-          ctx.shadowBlur = 3;
 
           ctx.beginPath();
           ctx.moveTo(0, 0);
           ctx.bezierCurveTo(-5 * bloomProgress, -len * 0.4, -4 * bloomProgress, -len * 0.95, 0, -len);
           ctx.bezierCurveTo(4 * bloomProgress, -len * 0.95, 5 * bloomProgress, -len * 0.4, 0, 0);
           ctx.fill();
+          ctx.stroke();
           ctx.restore();
         }
 
@@ -1277,19 +1290,17 @@
       function drawLilyHead(hue, bloomProgress, time) {
         const petals = 6;
         const len = 42 * bloomProgress;
+        const grad = ctx.createLinearGradient(0, 0, 0, -len);
+        grad.addColorStop(0, `hsl(${hue}, 75%, 36%)`);
+        grad.addColorStop(0.55, `hsl(${hue}, 82%, 58%)`);
+        grad.addColorStop(1, `hsl(${hue + 14}, 90%, 78%)`);
+
+        ctx.fillStyle = grad;
+
         for (let i = 0; i < petals; i++) {
           const angle = (i / petals) * Math.PI * 2 + 0.25;
           ctx.save();
           ctx.rotate(angle);
-
-          const grad = ctx.createLinearGradient(0, 0, 0, -len);
-          grad.addColorStop(0, `hsl(${hue}, 75%, 36%)`);
-          grad.addColorStop(0.55, `hsl(${hue}, 82%, 58%)`);
-          grad.addColorStop(1, `hsl(${hue + 14}, 90%, 78%)`);
-
-          ctx.fillStyle = grad;
-          ctx.shadowColor = 'rgba(0,0,0,0.3)';
-          ctx.shadowBlur = 4;
 
           ctx.beginPath();
           ctx.moveTo(0, 0);
@@ -1437,7 +1448,6 @@
 
         ctx.restore();
 
-        // Exact hitbox matching mate gourd + bombilla
         extraGiftHitbox = {
           x: mx - 30 * scale,
           y: my - 56 * scale,
@@ -1626,13 +1636,8 @@
         rimGrad.addColorStop(0, '#d88c6a');
         rimGrad.addColorStop(1, '#944d30');
         ctx.fillStyle = rimGrad;
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
-        ctx.shadowBlur = 6;
-        ctx.shadowOffsetY = 3;
         drawRoundedRect(baseX - potTopW / 2 - 4 * sceneScale, rimY, potTopW + 8 * sceneScale, 20 * sceneScale, 6 * sceneScale);
         ctx.fill();
-        ctx.shadowBlur = 0;
-        ctx.shadowOffsetY = 0;
 
         // 2. Left side of pot: Extra Gift Box -> Prepared Mate
         const leftX = baseX - sideOffset;
@@ -1640,7 +1645,6 @@
           const dropIn = Math.min(1, elapsed / 0.65);
           const easeDrop = 1 - Math.pow(1 - dropIn, 3);
           const smallScale = 0.54 * sceneScale * easeDrop;
-          // Center Y so bottom of box (cy + 65 * smallScale) sits directly on tableSurfaceY
           const boxCenterY = tableSurfaceY - 62 * smallScale - (1 - easeDrop) * 40;
 
           drawGiftBox(leftX, boxCenterY, smallScale, elapsed, '#3a6b56', 'Extra gift', true);
@@ -1669,9 +1673,10 @@
         ctx.translate(envX, envY);
         ctx.rotate(-0.08);
 
-        ctx.shadowColor = `rgba(255, 232, 195, ${0.35 + pulse * 0.45})`;
-        ctx.shadowBlur = 10 + pulse * 8;
-        ctx.shadowOffsetY = 4;
+        // Soft halo behind envelope (no shadowBlur cost)
+        ctx.fillStyle = `rgba(255, 232, 195, ${0.14 + pulse * 0.16})`;
+        drawRoundedRect(-envW / 2 - 6, -envH / 2 - 6, envW + 12, envH + 12, 8 * sceneScale);
+        ctx.fill();
 
         const envGrad = ctx.createLinearGradient(-envW / 2, -envH / 2, envW / 2, envH / 2);
         envGrad.addColorStop(0, '#fbf6ee');
@@ -1679,9 +1684,6 @@
         ctx.fillStyle = envGrad;
         drawRoundedRect(-envW / 2, -envH / 2, envW, envH, 5 * sceneScale);
         ctx.fill();
-
-        ctx.shadowBlur = 0;
-        ctx.shadowOffsetY = 0;
 
         ctx.strokeStyle = 'rgba(155, 125, 95, 0.45)';
         ctx.lineWidth = 1.3;
@@ -1712,7 +1714,6 @@
 
         ctx.restore();
 
-        // Exact hitbox centered on (envX, envY)
         envelopeHitbox = {
           x: envX - envW / 2,
           y: envY - envH / 2,
@@ -1783,7 +1784,6 @@
       function loop(now) {
         syncCanvasSize();
         const elapsed = (now - stateStartTime) / 1000;
-        ctx.clearRect(0, 0, width, height);
 
         if (state === 'TRAVEL') {
           drawTravelStage(elapsed);
